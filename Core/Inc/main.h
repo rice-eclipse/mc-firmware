@@ -36,11 +36,42 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+typedef struct{
+	char* name;
+	int channel;
+	int adc_cs;
+	float calibration_slope;
+	float calibration_int;
+} sensor;
+
+typedef struct{
+	GPIO_TypeDef *GPIO_Port;
+	int GPIO_Pin;
+} driver;
+
+typedef struct{
+	char* name;
+	int channel;
+	int adc_cs;
+	float calibration_slope;
+	float calibration_int;
+	int sample_rate;
+} monitor;
 
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+extern sensor *sensor_list;
+extern driver *driver_list;
+extern monitor *monitor_list;
+extern char *host_ip;
+extern int port;
+extern int sampling_freq_ign;
+extern int sampling_freq_standby;
+extern char *cmd_buffer;
+extern osEventFlagsId_t command_event;
+
 
 /* USER CODE END EC */
 

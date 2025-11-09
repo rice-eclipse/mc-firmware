@@ -26,6 +26,7 @@
 #include "usb_device.h"
 #include "gpio.h"
 
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -50,7 +51,10 @@
 
 /* USER CODE BEGIN PV */
 char TxBuffer[300];
-
+FATFS FatFs; 	//Fatfs handle
+const char *cmd_prototype =
+	"{\"type\": \"actuate\", \"driver-id\": 0, \"direction\": 1}";
+char RxBuffer[strlen(cmd_prototype)];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -100,18 +104,33 @@ int main(void)
   MX_FATFS_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
-  fres = f_mount(&FatFs, "", 1);
-         if (fres != FR_OK) {
-       	sprintf(TxBuffer,"f_mount error (%i)\r\n",fres);
-       	HAL_UART_Transmit(&huart2, (uint8_t*)TxBuffer, strlen(TxBuffer), -1);
-       	while(1);
-         }
+
+  /*Initialize all global variables */
+  sensor_list = NULL;
+  driver_list = NULL;
+  monitor_list = NULL;
+  host_ip = NULL;
+  port = 0;
+  sampling_freq_ign = 0;
+  sampling_freq_standby = 0;
+  /*end initialize */
+
+  /*Mount the sd card to read information from it*/
+  FRESULT fres = mount_sd(&FatFs);
+  if (fres != FR_OK){
+	  sprintf(TxBuffer,"f_mount error (%i)\r\n", fres);
+	  HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+	  while(1);
+  }
+
   /*parse the configuration file to get the available
 	sensors and drivers*/
-  parse_config(driver_list, sensor_list, monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby);
+  const char *config_str = read_file("config.json");
+  parse_config(config_str, driver_list, sensor_list, monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby);
   data_filename = create_file("data.csv");
   console_filename = create_file("console.log");
-
+  //wait for command
+  HAL_UART_Receive_IT(&huart2, RxBuffer, strlen(cmd_prototype));
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -180,7 +199,11 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-
+void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
+	HAL_UART_Receive_IT(&huart2, RxBuffer, strlen(cmd_prototype));
+	cmd_buffer = RxBuffer;
+	osEventFlagsSet(command_event, FLAGS_MSK2);
+}
 /* USER CODE END 4 */
 
 /**

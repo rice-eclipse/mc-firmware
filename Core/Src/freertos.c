@@ -22,6 +22,8 @@
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
+#include "mcp3208.h"
+#include "utils.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -49,8 +51,15 @@ char TxBuffer[300];
 osMessageQueueId_t sensorData_queue;
 osStatus_t queue_status;
 int sensor_count;
-uint32_t = samplingPeriod_ticks;
+uint32_t samplingPeriod_ticks;
+osTimerId_t sampling_timer;
+osEventFlagsId_t sampling_event;
+int driver_id;
+int direction;
 /* USER CODE END Variables */
+
+
+
 /* Definitions for dataReading */
 osThreadId_t dataReadingHandle;
 const osThreadAttr_t dataReading_attributes = {
@@ -75,13 +84,12 @@ const osThreadAttr_t dataSending_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-
+void samplingTimer_Callback (void *argument);
 /* USER CODE END FunctionPrototypes */
 
 void StartDataReading(void *argument);
 void StartCmdHandling(void *argument);
 void StartDataSending(void *argument);
-
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -94,7 +102,8 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 	sensor_count = sizeof(sensor_list)/sizeof(sensor_list[0]);
 	uint32_t tick_frequency = osKernelGetTickFreq();
-	samplingPeriod_ticks = (tick_frequency/sampling_freq_ign) / 1000;
+	samplingPeriod_ticks = (tick_frequency/sampling_freq_ign);
+
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -107,17 +116,18 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
+	sampling_timer = osTimerNew(samplingTimer_Callback, osTimerPeriodic,1U, NULL);
+	osTimerStart(sampling_timer, samplingPeriod_ticks);
   /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
-	sensorData_queue = osMessageQueueNew(QUEUE_DEPTH, sensor_count*sizeof(float), NULL);
+	sensorData_queue = osMessageQueueNew(QUEUE_DEPTH, sizeof(float*), NULL);
 	if (sensorData_queue == NULL){
 		while(1);
 
 	}
   /* USER CODE END RTOS_QUEUES */
-
   /* Create the thread(s) */
   /* creation of dataReading */
   dataReadingHandle = osThreadNew(StartDataReading,NULL, &dataReading_attributes);
@@ -134,6 +144,14 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_EVENTS */
   /* add events, ... */
+  sampling_event = osEventFlagsNew(NULL);
+  if (sampling_event == NULL){
+	  while(1);
+  }
+  command_event = osEventFlagsNew(NULL);
+    if (command_event == NULL){
+  	  while(1);
+    }
   /* USER CODE END RTOS_EVENTS */
 
 }
@@ -150,19 +168,31 @@ void StartDataReading(void *argument)
   /* init code for USB_DEVICE */
   MX_USB_DEVICE_Init();
   /* USER CODE BEGIN StartDataReading */
-  float sensor_readings[sensor_count];
+  float sensor_readings_A[sensor_count];
+  float sensor_readings_B[sensor_count];
+  //alternate between the two bufers so you can continue sampling while data is being written to SD
+  float *buffer_ptr = sensor_readings_A;
   /* Infinite loop */
+
   for(;;)
   {
+	osEventFlagsWait(sampling_event, FLAGS_MSK1, osFlagsWaitAny, osWaitForever);
 	for (int i = 0; i < sensor_count;i++){
-		sensor_readings[i] = read_adc(sensor_list[i].gpio_port, sensor_list[i].gpio_pin);
-		sensor_readings[i] = sensor_readings[i]*sensor_list[i].calibration_slope + sensor_list[i].calibration_intercept;
+		uint16_t adc_val =  MCP3208_GetAdcVal(sensor_list[i].channel, sensor_list[i].cs, &hspi3);
+		float adc_voltage = ((float)adc_val *4.7)/4096.0;
+		*(buffer_ptr+i) = adc_voltage*sensor_list[i].calibration_slope + sensor_list[i].calibration_intercept;
 	}
-	queue_status = osMessageQueuePut(sensorData_queue, sensor_readings, 0U,0U);
+	queue_status = osMessageQueuePut(sensorData_queue, &buffer_ptr, 0U,0U);
 	if (queue_status != osOK){
 		sprintf(TxBuffer, "unable to add to queue. Error: %d\n", queue_status);
+		//skip this sample
+		continue;
 	}
-    osDelay(samplingPeriod_ticks);
+	//swap buffers
+	else{
+		buffer_ptr = (buffer_ptr == sensor_readings_A) ? sensor_readings_B : sensor_readings_A;
+	}
+    //osDelay(samplingPeriod_ticks);
   }
   /* USER CODE END StartDataReading */
 }
@@ -180,6 +210,11 @@ void StartCmdHandling(void *argument)
   /* Infinite loop */
   for(;;)
   {
+	//get command from user
+	  osEventFlagsWait(command_event, FLAGS_MSK2, osFlagsWaitAny, osWaitForever);
+	  parse_command(cmd_buffer, &driver_id, &direction);
+	  HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
+
     osDelay(1);
   }
   /* USER CODE END StartCmdHandling */
@@ -205,6 +240,9 @@ void StartDataSending(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
-
+/*Callback just notifies the data reading thread when it can take the next sample */
+void samplingTimer_Callback (void *argument){
+	osEventFlagsSet(sampling_event, FLAGS_MSK1);
+}
 /* USER CODE END Application */
 

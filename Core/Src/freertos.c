@@ -24,6 +24,7 @@
 #include "cmsis_os.h"
 #include "mcp3208.h"
 #include "utils.h"
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -178,9 +179,9 @@ void StartDataReading(void *argument)
   {
 	osEventFlagsWait(sampling_event, FLAGS_MSK1, osFlagsWaitAny, osWaitForever);
 	for (int i = 0; i < sensor_count;i++){
-		uint16_t adc_val =  MCP3208_GetAdcVal(sensor_list[i].channel, sensor_list[i].cs, &hspi3);
+		uint16_t adc_val =  MCP3208_GetAdcVal(sensor_list[i].channel, sensor_list[i].adc_cs, &hspi3);
 		float adc_voltage = ((float)adc_val *4.7)/4096.0;
-		*(buffer_ptr+i) = adc_voltage*sensor_list[i].calibration_slope + sensor_list[i].calibration_intercept;
+		*(buffer_ptr+i) = adc_voltage*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
 	}
 	queue_status = osMessageQueuePut(sensorData_queue, &buffer_ptr, 0U,0U);
 	if (queue_status != osOK){

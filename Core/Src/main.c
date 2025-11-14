@@ -25,6 +25,7 @@
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
+#include "utils.h"
 
 
 /* Private includes ----------------------------------------------------------*/

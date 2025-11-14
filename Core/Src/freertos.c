@@ -24,7 +24,7 @@
 #include "cmsis_os.h"
 #include "mcp3208.h"
 #include "utils.h"
-#include <stdio.h>
+#include "fatfs.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -231,10 +231,42 @@ void StartCmdHandling(void *argument)
 void StartDataSending(void *argument)
 {
   /* USER CODE BEGIN StartDataSending */
+  float *msg_ptr; // pointer to data from queue
+  FIL logFile; // file obj
+  FRESULT fr; // result code
+  UINT numBytes; // # of bytes actually written
+  float *copy_msg_ptr;
+
+  float current_buffer[sensor_count];
+
+  int websocket_interval = 500; // 500 ms, edit actual value?
+  uint32_t system_time; // real-time
+  int last_websocket_time = 0;
+
+  fr = f_open(&logFile, "datalog.txt", FA_WRITE | FA_OPEN_APPEND);
+  if (fr != FR_OK) {
+    osThreadTerminate(NULL); // quit if the file open fails
+  }
+
   /* Infinite loop */
   for(;;)
   {
-    osDelay(1);
+    queue_status = osMessageQueueGet(sensorData_queue, &msg_ptr, 0U, osWaitForever);
+
+    if (queue_status == osOK) {
+      memcpy(current_buffer, msg_ptr, sensor_count * sizeof(float));
+
+      fr = f_write(&logFile, current_buffer, sensor_count * sizeof(float), &numBytes); // Write Data from the current buffer to the SD Card
+      if (fr == FR_OK) {
+        f_sync(&logFile);
+      }
+
+      system_time = osKernelGetTickCount();
+      if (system_time - last_websocket_time > websocket_interval) { // websocket
+          // Send msg_ptr over Websocket: websocket_send_function(current_buffer)
+          last_websocket_time = system_time;
+      }
+    }
   }
   /* USER CODE END StartDataSending */
 }

@@ -36,7 +36,7 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-typedef struct{
+typedef struct sensor{
 	char* name;
 	int channel;
 	int adc_cs;
@@ -44,12 +44,12 @@ typedef struct{
 	float calibration_int;
 } sensor;
 
-typedef struct{
+typedef struct driver{
 	GPIO_TypeDef *GPIO_Port;
 	int GPIO_Pin;
 } driver;
 
-typedef struct{
+typedef struct monitor{
 	char* name;
 	int channel;
 	int adc_cs;

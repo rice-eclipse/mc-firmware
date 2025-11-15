@@ -21,7 +21,7 @@ int parse_config(const char *config_str, driver *driver_list,sensor *sensor_list
     const cJSON *monitor = NULL;
 	int status = 0;
 
-	cJSON *config_json = cJSON_Parse(config_string);
+	cJSON *config_json = cJSON_Parse(config_str);
 	if (config_json == NULL){
 		status = 1;
 		goto end;
@@ -56,7 +56,7 @@ int parse_config(const char *config_str, driver *driver_list,sensor *sensor_list
     }
 
     int sensor_count = cJSON_GetArraySize(sensors);
-    sensor_list = (sensor *)malloc(sensor_count*sizeof(sensor));
+    sensor *sensor_list = (sensor *)malloc(sensor_count*sizeof(sensor));
     int curr_sensor = 0;
     cJSON_ArrayForEach(sensor, sensors){
         char* enabled = cJSON_GetObjectItemCaseSensitive(sensor, "enabled")->valuestring;
@@ -197,6 +197,7 @@ char *read_file(const char *filename){
 	   f_close(&fil);
 	   return readBuf;
 }
+
 char *create_file(const char *filename){
 	FIL fil;
 	FRESULT fres;

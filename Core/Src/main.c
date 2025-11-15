@@ -17,6 +17,7 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
+
 #include "main.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
@@ -26,6 +27,7 @@
 #include "usb_device.h"
 #include "gpio.h"
 #include "utils.h"
+#include <stdio.h>
 
 
 /* Private includes ----------------------------------------------------------*/

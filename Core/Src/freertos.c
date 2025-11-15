@@ -25,7 +25,7 @@
 #include "mcp3208.h"
 #include "utils.h"
 #include "fatfs.h"
-
+#include <stdio.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -117,7 +117,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-	sampling_timer = osTimerNew(samplingTimer_Callback, osTimerPeriodic,1U, NULL);
+	sampling_timer = osTimerNew(samplingTimer_Callback, osTimerPeriodic,&1U, NULL);
 	osTimerStart(sampling_timer, samplingPeriod_ticks);
   /* USER CODE END RTOS_TIMERS */
 
@@ -177,7 +177,7 @@ void StartDataReading(void *argument)
 
   for(;;)
   {
-	osEventFlagsWait(sampling_event, FLAGS_MSK1, osFlagsWaitAny, osWaitForever);
+	osEventFlagsWait(sampling_event, 0x00000001U, osFlagsWaitAny, osWaitForever);
 	for (int i = 0; i < sensor_count;i++){
 		uint16_t adc_val =  MCP3208_GetAdcVal(sensor_list[i].channel, sensor_list[i].adc_cs, &hspi3);
 		float adc_voltage = ((float)adc_val *4.7)/4096.0;
@@ -212,7 +212,7 @@ void StartCmdHandling(void *argument)
   for(;;)
   {
 	//get command from user
-	  osEventFlagsWait(command_event, FLAGS_MSK2, osFlagsWaitAny, osWaitForever);
+	  osEventFlagsWait(command_event, 0x00000010U, osFlagsWaitAny, osWaitForever);
 	  parse_command(cmd_buffer, &driver_id, &direction);
 	  HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
 
@@ -275,7 +275,7 @@ void StartDataSending(void *argument)
 /* USER CODE BEGIN Application */
 /*Callback just notifies the data reading thread when it can take the next sample */
 void samplingTimer_Callback (void *argument){
-	osEventFlagsSet(sampling_event, FLAGS_MSK1);
+	osEventFlagsSet(sampling_event, 0x00000001U);
 }
 /* USER CODE END Application */
 

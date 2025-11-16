@@ -53,11 +53,11 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-char TxBuffer[300];
+static char TxBuffer[300];
 FATFS FatFs; 	//Fatfs handle
 const char *cmd_prototype =
 	"{\"type\": \"actuate\", \"driver-id\": 0, \"direction\": 1}";
-char RxBuffer[strlen(cmd_prototype)];
+char RxBuffer[52];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -69,6 +69,17 @@ void MX_FREERTOS_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+sensor *sensor_list = NULL;
+driver *driver_list = NULL;
+monitor *monitor_list = NULL;
+char *host_ip = NULL;
+int port = 0;
+int sampling_freq_ign = 0;
+int sampling_freq_standby = 0;
+char *console_filename = NULL;
+char *data_filename = NULL;
+char *cmd_buffer = NULL;
+osEventFlagsId_t command_event;
 
 /* USER CODE END 0 */
 
@@ -80,6 +91,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
+
 
   /* USER CODE END 1 */
 
@@ -109,13 +121,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
 
   /*Initialize all global variables */
-  sensor_list = NULL;
-  driver_list = NULL;
-  monitor_list = NULL;
-  host_ip = NULL;
-  port = 0;
-  sampling_freq_ign = 0;
-  sampling_freq_standby = 0;
+  	
   /*end initialize */
 
   /*Mount the sd card to read information from it*/
@@ -133,7 +139,7 @@ int main(void)
   data_filename = create_file("data.csv");
   console_filename = create_file("console.log");
   //wait for command
-  HAL_UART_Receive_IT(&huart2, RxBuffer, strlen(cmd_prototype));
+  //HAL_UART_Receive_IT(&huart2,(uint8_t *) RxBuffer, strlen(cmd_prototype));
   /* USER CODE END 2 */
 
   /* Init scheduler */
@@ -148,6 +154,7 @@ int main(void)
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -202,10 +209,11 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	HAL_UART_Receive_IT(&huart2, RxBuffer, strlen(cmd_prototype));
+	HAL_UART_Receive_IT(&huart2, (uint8_t *)RxBuffer, strlen(cmd_prototype));
 	cmd_buffer = RxBuffer;
-	osEventFlagsSet(command_event, FLAGS_MSK2);
+	osEventFlagsSet(command_event,  0x00000010U);
 }
 /* USER CODE END 4 */
 

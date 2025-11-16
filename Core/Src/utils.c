@@ -9,9 +9,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-extern UART_HandleTypeDef huart2;
-extern char TxBuffer[300];
-extern char buffer[];      // if defined elsewhere
+static char TxBuffer[300];
+static char buffer[];      // if defined elsewhere
 
 int parse_config(const char *config_str,
                  driver *driver_list,
@@ -22,17 +21,17 @@ int parse_config(const char *config_str,
                  int *sampling_freq_ign,
                  int *sampling_freq_standby)
 {
-    const cJSON *sensor = NULL;
     const cJSON *host = NULL;
     const cJSON *host_children = NULL;
     const cJSON *sampling_f_ign = NULL;
     const cJSON *sampling_f_standby = NULL;
     const cJSON *sensors = NULL;
+    const cJSON* sensor_obj = NULL;
     const cJSON *drivers = NULL;
-    const cJSON *driver = NULL;
+    const cJSON *driver_obj = NULL;
     const cJSON *ignition_obj = NULL;
     const cJSON *monitors = NULL;
-    const cJSON *monitor = NULL;
+    const cJSON *monitor_obj = NULL;
     int status = 0;
 
 	cJSON *config_json = cJSON_Parse(config_str);
@@ -76,22 +75,22 @@ int parse_config(const char *config_str,
     }
 
     int sensor_count = cJSON_GetArraySize(sensors);
-    sensor *sensor_list = (sensor *)malloc(sensor_count*sizeof(sensor));
+    sensor_list = malloc(sensor_count*sizeof(sensor));
     int curr_sensor = 0;
 
-    cJSON_ArrayForEach(sensor, sensors) {
-        char *enabled = cJSON_GetObjectItemCaseSensitive(sensor, "enabled")->valuestring;
+    cJSON_ArrayForEach(sensor_obj, sensors) {
+        char *enabled = cJSON_GetObjectItemCaseSensitive(sensor_obj, "enabled")->valuestring;
         if (enabled) {
             sensor new_sensor;
-            new_sensor.name = cJSON_GetObjectItemCaseSensitive(sensor, "sensor")->valuestring;
-            new_sensor.channel = cJSON_GetObjectItemCaseSensitive(sensor, "channel")->valueint;
-            new_sensor.adc_cs = cJSON_GetObjectItemCaseSensitive(sensor, "adc_cs")->valueint;
+            new_sensor.name = cJSON_GetObjectItemCaseSensitive(sensor_obj, "sensor")->valuestring;
+            new_sensor.channel = cJSON_GetObjectItemCaseSensitive(sensor_obj, "channel")->valueint;
+            new_sensor.adc_cs = cJSON_GetObjectItemCaseSensitive(sensor_obj, "adc_cs")->valueint;
             new_sensor.calibration_int =
-                (float)cJSON_GetObjectItemCaseSensitive(sensor, "calibration_intercept")->valuedouble;
+                (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_intercept")->valuedouble;
             new_sensor.calibration_slope =
-                (float)cJSON_GetObjectItemCaseSensitive(sensor, "calibration_slope")->valuedouble;
+                (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_slope")->valuedouble;
 
-            sensor_buff[curr_sensor] = new_sensor;  // assuming global buffer
+            sensor_list[curr_sensor] = new_sensor;  // assuming global buffer
 #ifdef TEST
             /* In TEST mode, print sensor config over UART instead of relying on SD */
             int len = snprintf(
@@ -117,14 +116,14 @@ int parse_config(const char *config_str,
     drivers = cJSON_GetObjectItemCaseSensitive(config_json, "drivers");
     if (cJSON_IsArray(drivers)) {
         int driver_count = cJSON_GetArraySize(drivers);
-        drv_buff = (driver *)malloc(driver_count * sizeof(driver));
+        driver_list = malloc(driver_count * sizeof(driver));
         int curr_driver = 0;
 
-        cJSON_ArrayForEach(driver, drivers) {
-            char *enabled = cJSON_GetObjectItemCaseSensitive(driver, "enabled")->valuestring;
+        cJSON_ArrayForEach(driver_obj, drivers) {
+            char *enabled = cJSON_GetObjectItemCaseSensitive(driver_obj, "enabled")->valuestring;
             if (enabled) {
                 driver new_driver;
-                char *gpio_port = cJSON_GetObjectItemCaseSensitive(driver, "gpio_port")->valuestring;
+                char *gpio_port = cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_port")->valuestring;
                 if (strcmp(gpio_port, "GPIOA") == 0) {
                     new_driver.GPIO_Port = GPIOA;
                 } else if (strcmp(gpio_port, "GPIOB") == 0) {
@@ -133,9 +132,9 @@ int parse_config(const char *config_str,
                     new_driver.GPIO_Port = GPIOC;
                 }
                 new_driver.GPIO_Pin =
-                    (uint16_t)cJSON_GetObjectItemCaseSensitive(driver, "gpio_pin")->valueint;
+                    (uint16_t)cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_pin")->valueint;
 
-                drv_buff[curr_driver] = new_driver;
+                driver_list[curr_driver] = new_driver;
 #ifdef TEST
                 int len = snprintf(
                     TxBuffer,
@@ -157,6 +156,7 @@ int parse_config(const char *config_str,
     /* ignition config */
     ignition_obj = cJSON_GetObjectItemCaseSensitive(config_json, "ignition");
     if (ignition_obj != NULL) {
+    	driver ignition;
         char *gpio_port = cJSON_GetObjectItemCaseSensitive(ignition_obj, "gpio_port")->valuestring;
         if (strcmp(gpio_port, "GPIOA") == 0) {
             ignition.GPIO_Port = GPIOA;
@@ -185,22 +185,22 @@ int parse_config(const char *config_str,
     monitors = cJSON_GetObjectItemCaseSensitive(config_json, "monitors");
     if (cJSON_IsArray(monitors)) {
         int monitor_count = cJSON_GetArraySize(monitors);
-        monitor_buff = (monitor *)malloc(monitor_count * sizeof(monitor));
+        monitor_list = malloc(monitor_count * sizeof(monitor));
         int curr_monitor = 0;
 
-        cJSON_ArrayForEach(monitor, monitors) {
-            char *enabled = cJSON_GetObjectItemCaseSensitive(monitor, "enabled")->valuestring;
+        cJSON_ArrayForEach(monitor_obj, monitors) {
+            char *enabled = cJSON_GetObjectItemCaseSensitive(monitor_obj, "enabled")->valuestring;
             if (enabled) {
                 monitor new_monitor;
-                new_monitor.name = cJSON_GetObjectItemCaseSensitive(monitor, "monitor")->valuestring;
-                new_monitor.channel = cJSON_GetObjectItemCaseSensitive(monitor, "channel")->valueint;
-                new_monitor.adc_cs = cJSON_GetObjectItemCaseSensitive(monitor, "adc_cs")->valueint;
+                new_monitor.name = cJSON_GetObjectItemCaseSensitive(monitor_obj, "monitor")->valuestring;
+                new_monitor.channel = cJSON_GetObjectItemCaseSensitive(monitor_obj, "channel")->valueint;
+                new_monitor.adc_cs = cJSON_GetObjectItemCaseSensitive(monitor_obj, "adc_cs")->valueint;
                 new_monitor.calibration_int =
-                    (float)cJSON_GetObjectItemCaseSensitive(monitor, "calibration_intercept")->valuedouble;
+                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_intercept")->valuedouble;
                 new_monitor.calibration_slope =
-                    (float)cJSON_GetObjectItemCaseSensitive(monitor, "calibration_slope")->valuedouble;
+                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_slope")->valuedouble;
 
-                monitor_buff[curr_monitor] = new_monitor;
+                monitor_list[curr_monitor] = new_monitor;
 #ifdef TEST
                 int len = snprintf(
                     TxBuffer,
@@ -302,6 +302,26 @@ char *read_file(const char *filename)
     const char msg[] = "[TEST] Using built-in config, skipping SD read\r\n";
     HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
     return test_config;
+#else
+
+    FIL fil;
+	FRESULT fres;
+	fres = f_open(&fil, filename, FA_READ);
+	   if(fres != FR_OK) {
+		sprintf(buffer,"f_open error (%i)\r\n", fres);
+		HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
+		while (1);
+	   }
+
+	   //get the number of characters to allocate to this string
+	   f_lseek(&fil,SEEK_END);
+	   long size = f_tell(&fil);
+	   char readBuf[size];
+
+	   TCHAR *rres = f_gets((TCHAR*)readBuf,size, &fil);
+	   if(rres != 0) {
+			sprintf(TxBuffer,"Read string from 'test.txt' contents: %s\r\n", readBuf);
+			HAL_UART_Transmit(&huart2, (uint8_t*)TxBuffer, sizeof(*TxBuffer), HAL_MAX_DELAY);
 
 	   } else {
 			sprintf(TxBuffer,"f_gets error (%i)\r\n", fres);
@@ -309,17 +329,7 @@ char *read_file(const char *filename)
 	   }
 	   f_close(&fil);
 	   return readBuf;
-}
-
-char *create_file(const char *filename){
-	FIL fil;
-	FRESULT fres;
-	fres = f_open(&fil, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
-	   if(fres != FR_OK) {
-	 	sprintf(buffer,"f_open error (%i)\r\n", fres);
-	 	HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), -1);
-	   }
-	f_close(&fil);
+#endif
 }
 
 char *create_file(const char *filename)

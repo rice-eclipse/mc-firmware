@@ -36,7 +36,7 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
-typedef struct sensor{
+typedef struct {
 	char* name;
 	int channel;
 	int adc_cs;
@@ -44,12 +44,12 @@ typedef struct sensor{
 	float calibration_int;
 } sensor;
 
-typedef struct driver{
+typedef struct {
 	GPIO_TypeDef *GPIO_Port;
 	int GPIO_Pin;
 } driver;
 
-typedef struct monitor{
+typedef struct{
 	char* name;
 	int channel;
 	int adc_cs;
@@ -70,6 +70,8 @@ extern int port;
 extern int sampling_freq_ign;
 extern int sampling_freq_standby;
 extern char *cmd_buffer;
+extern char *console_filename;
+extern char *data_filename;
 extern osEventFlagsId_t command_event;
 
 

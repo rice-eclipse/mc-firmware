@@ -1,0 +1,5 @@
+../Core/Src/freertos.c:103:6:MX_FREERTOS_Init	4
+../Core/Src/freertos.c:172:6:StartDataReading	4
+../Core/Src/freertos.c:213:6:StartCmdHandling	1
+../Core/Src/freertos.c:236:6:StartDataSending	5
+../Core/Src/freertos.c:282:6:samplingTimer_Callback	1

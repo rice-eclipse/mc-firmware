@@ -26,6 +26,7 @@
 #include "utils.h"
 #include "fatfs.h"
 #include <stdio.h>
+#include <string.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -48,7 +49,7 @@
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-char TxBuffer[300];
+static char TxBuffer[300];
 osMessageQueueId_t sensorData_queue;
 osStatus_t queue_status;
 int sensor_count;
@@ -101,6 +102,9 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
+	char *cmd_buffer = NULL;
+	char *console_filename = NULL;
+	char *data_filename = NULL;
 	sensor_count = sizeof(sensor_list)/sizeof(sensor_list[0]);
 	uint32_t tick_frequency = osKernelGetTickFreq();
 	samplingPeriod_ticks = (tick_frequency/sampling_freq_ign);
@@ -117,7 +121,8 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
-	sampling_timer = osTimerNew(samplingTimer_Callback, osTimerPeriodic,&1U, NULL);
+	uint32_t lval = 1U;
+	sampling_timer = osTimerNew(samplingTimer_Callback, osTimerPeriodic,&lval, NULL);
 	osTimerStart(sampling_timer, samplingPeriod_ticks);
   /* USER CODE END RTOS_TIMERS */
 

@@ -10,6 +10,7 @@
 #include "main.h"
 #include "fatfs.h"
 #include "cJSON.h"
+#include "usart.h"
 
 int parse_config(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list,
 				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby);

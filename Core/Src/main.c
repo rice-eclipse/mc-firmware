@@ -135,7 +135,7 @@ int main(void)
   /*parse the configuration file to get the available
 	sensors and drivers*/
   const char *config_str = read_file("config.json");
-  parse_config(config_str, driver_list, sensor_list, monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby);
+  parse_config(config_str, &driver_list, &sensor_list, &monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby);
   data_filename = create_file("data.csv");
   console_filename = create_file("console.log");
   //wait for command

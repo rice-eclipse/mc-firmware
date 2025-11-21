@@ -13,9 +13,9 @@ static char TxBuffer[300];
 static char buffer[];      // if defined elsewhere
 
 int parse_config(const char *config_str,
-                 driver *driver_list,
-                 sensor *sensor_list,
-                 monitor *monitor_list,
+                 driver **driver_list,
+                 sensor **sensor_list,
+                 monitor **monitor_list,
                  char *host_ip,
                  int *port,
                  int *sampling_freq_ign,
@@ -75,7 +75,7 @@ int parse_config(const char *config_str,
     }
 
     int sensor_count = cJSON_GetArraySize(sensors);
-    sensor_list = malloc(sensor_count*sizeof(sensor));
+    *sensor_list = (sensor *)malloc(sensor_count*sizeof(sensor));
     int curr_sensor = 0;
 
     cJSON_ArrayForEach(sensor_obj, sensors) {
@@ -90,7 +90,7 @@ int parse_config(const char *config_str,
             new_sensor.calibration_slope =
                 (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_slope")->valuedouble;
 
-            sensor_list[curr_sensor] = new_sensor;  // assuming global buffer
+            (*sensor_list)[curr_sensor] = new_sensor;  // assuming global buffer
 #ifdef TEST
             /* In TEST mode, print sensor config over UART instead of relying on SD */
             int len = snprintf(
@@ -116,7 +116,7 @@ int parse_config(const char *config_str,
     drivers = cJSON_GetObjectItemCaseSensitive(config_json, "drivers");
     if (cJSON_IsArray(drivers)) {
         int driver_count = cJSON_GetArraySize(drivers);
-        driver_list = malloc(driver_count * sizeof(driver));
+        *driver_list = (driver *)malloc(driver_count * sizeof(driver));
         int curr_driver = 0;
 
         cJSON_ArrayForEach(driver_obj, drivers) {
@@ -134,7 +134,7 @@ int parse_config(const char *config_str,
                 new_driver.GPIO_Pin =
                     (uint16_t)cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_pin")->valueint;
 
-                driver_list[curr_driver] = new_driver;
+                (*driver_list)[curr_driver] = new_driver;
 #ifdef TEST
                 int len = snprintf(
                     TxBuffer,
@@ -185,7 +185,7 @@ int parse_config(const char *config_str,
     monitors = cJSON_GetObjectItemCaseSensitive(config_json, "monitors");
     if (cJSON_IsArray(monitors)) {
         int monitor_count = cJSON_GetArraySize(monitors);
-        monitor_list = malloc(monitor_count * sizeof(monitor));
+        *monitor_list = (monitor *)malloc(monitor_count * sizeof(monitor));
         int curr_monitor = 0;
 
         cJSON_ArrayForEach(monitor_obj, monitors) {
@@ -200,7 +200,7 @@ int parse_config(const char *config_str,
                 new_monitor.calibration_slope =
                     (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_slope")->valuedouble;
 
-                monitor_list[curr_monitor] = new_monitor;
+                (*monitor_list)[curr_monitor] = new_monitor;
 #ifdef TEST
                 int len = snprintf(
                     TxBuffer,

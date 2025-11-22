@@ -22,11 +22,10 @@
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
-#include "mcp3208.h"
+#include "spi.h"
 #include "utils.h"
-#include "fatfs.h"
-#include <stdio.h>
 #include <string.h>
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -59,9 +58,6 @@ osEventFlagsId_t sampling_event;
 int driver_id;
 int direction;
 /* USER CODE END Variables */
-
-
-
 /* Definitions for dataReading */
 osThreadId_t dataReadingHandle;
 const osThreadAttr_t dataReading_attributes = {
@@ -92,6 +88,7 @@ void samplingTimer_Callback (void *argument);
 void StartDataReading(void *argument);
 void StartCmdHandling(void *argument);
 void StartDataSending(void *argument);
+
 extern void MX_USB_DEVICE_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -134,9 +131,10 @@ void MX_FREERTOS_Init(void) {
 
 	}
   /* USER CODE END RTOS_QUEUES */
+
   /* Create the thread(s) */
   /* creation of dataReading */
-  dataReadingHandle = osThreadNew(StartDataReading,NULL, &dataReading_attributes);
+  dataReadingHandle = osThreadNew(StartDataReading, NULL, &dataReading_attributes);
 
   /* creation of cmdHandling */
   cmdHandlingHandle = osThreadNew(StartCmdHandling, NULL, &cmdHandling_attributes);
@@ -228,9 +226,7 @@ void StartCmdHandling(void *argument)
   {
 	//get command from user
 	  osEventFlagsWait(command_event, 0x00000010U, osFlagsWaitAny, osWaitForever);
-	  parse_command(cmd_buffer, &driver_id, &direction);
-	  HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
-
+	  parse_command(cmd_buffer, &driver_id, &direction, driver_list);
     osDelay(1);
   }
   /* USER CODE END StartCmdHandling */

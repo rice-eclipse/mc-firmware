@@ -1,0 +1,5 @@
+../Core/Src/utils.c:15:5:parse_config	208	static
+../Core/Src/utils.c:287:5:parse_command	48	static
+../Core/Src/utils.c:335:7:read_file	624	dynamic
+../Core/Src/utils.c:393:7:create_file	584	static
+../Core/Src/utils.c:412:5:mount_sd	16	static

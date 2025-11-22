@@ -39,20 +39,20 @@ extern "C" {
 typedef struct {
 	char* name;
 	int channel;
-	int adc_cs;
+	uint16_t adc_cs;
 	float calibration_slope;
 	float calibration_int;
 } sensor;
 
 typedef struct {
 	GPIO_TypeDef *GPIO_Port;
-	int GPIO_Pin;
+	uint16_t GPIO_Pin;
 } driver;
 
 typedef struct{
 	char* name;
 	int channel;
-	int adc_cs;
+	uint16_t adc_cs;
 	float calibration_slope;
 	float calibration_int;
 	int sample_rate;
@@ -122,6 +122,18 @@ void Error_Handler(void);
 #define ADC_MOSI_GPIO_Port GPIOC
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
+#define DRV0_Pin GPIO_PIN_4
+#define DRV0_GPIO_Port GPIOB
+#define DRV1_Pin GPIO_PIN_5
+#define DRV1_GPIO_Port GPIOB
+#define DRV2_Pin GPIO_PIN_6
+#define DRV2_GPIO_Port GPIOB
+#define DRV3_Pin GPIO_PIN_7
+#define DRV3_GPIO_Port GPIOB
+#define DRV4_Pin GPIO_PIN_8
+#define DRV4_GPIO_Port GPIOB
+#define IGN_Pin GPIO_PIN_9
+#define IGN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

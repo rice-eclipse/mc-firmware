@@ -17,7 +17,6 @@
   */
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
-
 #include "main.h"
 #include "cmsis_os.h"
 #include "fatfs.h"
@@ -26,9 +25,6 @@
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
-#include "utils.h"
-#include <stdio.h>
-
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -145,6 +141,7 @@ int main(void)
   /* Init scheduler */
   osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
   MX_FREERTOS_Init();
+
   /* Start scheduler */
   osKernelStart();
 

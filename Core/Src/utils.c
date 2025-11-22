@@ -78,19 +78,36 @@ int parse_config(const char *config_str,
     *sensor_list = (sensor *)malloc(sensor_count*sizeof(sensor));
     int curr_sensor = 0;
 
+    int cs_pin =0;
     cJSON_ArrayForEach(sensor_obj, sensors) {
         char *enabled = cJSON_GetObjectItemCaseSensitive(sensor_obj, "enabled")->valuestring;
-        if (enabled) {
+        if (strcmp(enabled,"true") == 0) {
             sensor new_sensor;
             new_sensor.name = cJSON_GetObjectItemCaseSensitive(sensor_obj, "sensor")->valuestring;
             new_sensor.channel = cJSON_GetObjectItemCaseSensitive(sensor_obj, "channel")->valueint;
-            new_sensor.adc_cs = cJSON_GetObjectItemCaseSensitive(sensor_obj, "adc_cs")->valueint;
+            cs_pin = cJSON_GetObjectItemCaseSensitive(sensor_obj, "adc_cs")->valueint;
             new_sensor.calibration_int =
                 (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_intercept")->valuedouble;
             new_sensor.calibration_slope =
                 (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_slope")->valuedouble;
 
-            (*sensor_list)[curr_sensor] = new_sensor;  // assuming global buffer
+            switch (cs_pin){
+            case 1:
+            	new_sensor.adc_cs = ADC1_CS_Pin;
+            	break;
+            case 2:
+            	new_sensor.adc_cs = ADC2_CS_Pin;
+            	break;
+            case 3:
+            	new_sensor.adc_cs = ADC3_CS_Pin;
+            	break;
+            //need to do some error handling here
+            default:
+            	new_sensor.adc_cs = ADC3_CS_Pin;
+            	break;
+            }
+
+            (*sensor_list)[curr_sensor] = new_sensor;
 #ifdef TEST
             /* In TEST mode, print sensor config over UART instead of relying on SD */
             int len = snprintf(
@@ -119,9 +136,10 @@ int parse_config(const char *config_str,
         *driver_list = (driver *)malloc(driver_count * sizeof(driver));
         int curr_driver = 0;
 
+        int gpio_pin = 0;
         cJSON_ArrayForEach(driver_obj, drivers) {
             char *enabled = cJSON_GetObjectItemCaseSensitive(driver_obj, "enabled")->valuestring;
-            if (enabled) {
+            if (strcmp(enabled,"true") == 0) {
                 driver new_driver;
                 char *gpio_port = cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_port")->valuestring;
                 if (strcmp(gpio_port, "GPIOA") == 0) {
@@ -131,8 +149,31 @@ int parse_config(const char *config_str,
                 } else {
                     new_driver.GPIO_Port = GPIOC;
                 }
-                new_driver.GPIO_Pin =
-                    (uint16_t)cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_pin")->valueint;
+
+                gpio_pin = cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_pin")->valueint;
+
+                switch (gpio_pin){
+                case 0:
+                	new_driver.GPIO_Pin = DRV0_Pin;
+                	break;
+                case 1:
+                	new_driver.GPIO_Pin = DRV1_Pin;
+                	break;
+                case 2:
+                	new_driver.GPIO_Pin = DRV2_Pin;
+                	break;
+                case 3:
+                	new_driver.GPIO_Pin = DRV3_Pin;
+                	break;
+                case 4:
+                	new_driver.GPIO_Pin = DRV4_Pin;
+                	break;
+                // Need to do error handling here
+                default:
+                	new_driver.GPIO_Pin = DRV0_Pin;
+                	break;
+                }
+
 
                 (*driver_list)[curr_driver] = new_driver;
 #ifdef TEST
@@ -158,6 +199,7 @@ int parse_config(const char *config_str,
     if (ignition_obj != NULL) {
     	driver ignition;
         char *gpio_port = cJSON_GetObjectItemCaseSensitive(ignition_obj, "gpio_port")->valuestring;
+        int ign_pin = 0;
         if (strcmp(gpio_port, "GPIOA") == 0) {
             ignition.GPIO_Port = GPIOA;
         } else if (strcmp(gpio_port, "GPIOB") == 0) {
@@ -165,8 +207,7 @@ int parse_config(const char *config_str,
         } else {
             ignition.GPIO_Port = GPIOC;
         }
-        ignition.GPIO_Pin =
-            (uint16_t)cJSON_GetObjectItemCaseSensitive(ignition_obj, "gpio_pin")->valueint;
+        ignition.GPIO_Pin = IGN_Pin;
 #ifdef TEST
         int len = snprintf(
             TxBuffer,
@@ -188,18 +229,34 @@ int parse_config(const char *config_str,
         *monitor_list = (monitor *)malloc(monitor_count * sizeof(monitor));
         int curr_monitor = 0;
 
+        int cs_pin = 0;
         cJSON_ArrayForEach(monitor_obj, monitors) {
             char *enabled = cJSON_GetObjectItemCaseSensitive(monitor_obj, "enabled")->valuestring;
-            if (enabled) {
+            if (strcmp(enabled,"true")) {
                 monitor new_monitor;
                 new_monitor.name = cJSON_GetObjectItemCaseSensitive(monitor_obj, "monitor")->valuestring;
                 new_monitor.channel = cJSON_GetObjectItemCaseSensitive(monitor_obj, "channel")->valueint;
-                new_monitor.adc_cs = cJSON_GetObjectItemCaseSensitive(monitor_obj, "adc_cs")->valueint;
+                cs_pin = cJSON_GetObjectItemCaseSensitive(monitor_obj, "adc_cs")->valueint;
                 new_monitor.calibration_int =
                     (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_intercept")->valuedouble;
                 new_monitor.calibration_slope =
                     (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_slope")->valuedouble;
 
+                switch (cs_pin){
+					case 1:
+						new_monitor.adc_cs = ADC1_CS_Pin;
+						break;
+					case 2:
+						new_monitor.adc_cs = ADC2_CS_Pin;
+						break;
+					case 3:
+						new_monitor.adc_cs = ADC3_CS_Pin;
+						break;
+					//need to do some error handling here
+					default:
+						new_monitor.adc_cs = ADC3_CS_Pin;
+						break;
+					}
                 (*monitor_list)[curr_monitor] = new_monitor;
 #ifdef TEST
                 int len = snprintf(
@@ -227,7 +284,7 @@ end:
     return status;
 }
 
-int parse_command(const char *json_string, int *driver_id, int *direction)
+int parse_command(const char *json_string, int *driver_id, int *direction, driver *driver_list)
 {
     // CJSON variables to extract the relevant fields
     cJSON *cmd_type = NULL;
@@ -256,6 +313,7 @@ int parse_command(const char *json_string, int *driver_id, int *direction)
             if (cJSON_IsNumber(dir)) {
                 *driver_id = drv_id->valueint;
                 *direction = dir->valueint;
+                HAL_GPIO_WritePin(driver_list[*driver_id].GPIO_Port, driver_list[*driver_id].GPIO_Pin, *direction);
                 status = 0;
             } else {
                 status = 1;

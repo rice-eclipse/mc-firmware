@@ -184,7 +184,17 @@ void StartDataReading(void *argument)
   {
 	osEventFlagsWait(sampling_event, 0x00000001U, osFlagsWaitAny, osWaitForever);
 	for (int i = 0; i < sensor_count;i++){
-		uint16_t adc_val =  MCP3208_GetAdcVal(sensor_list[i].channel, sensor_list[i].adc_cs, &hspi3);
+    int cs_pin;
+    if (sensor_list[i].adc_cs == 1){
+      cs_pin = ADC1_CS_Pin;
+    }
+    else if (sensor_list[i].adc_cs == 2){
+      cs_pin = ADC2_CS_Pin;
+    }
+    else {
+      cs_pin = ADC3_CS_Pin;
+    }
+		uint16_t adc_val =  MCP3208_GetAdcVal(sensor_list[i].channel, cs_pin, &hspi3);
 		float adc_voltage = ((float)adc_val *4.7)/4096.0;
 		*(buffer_ptr+i) = adc_voltage*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
 	}

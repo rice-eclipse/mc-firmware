@@ -1,5 +1,0 @@
-../Core/Src/utils.c:15:5:parse_config	38
-../Core/Src/utils.c:287:5:parse_command	7
-../Core/Src/utils.c:335:7:read_file	3
-../Core/Src/utils.c:393:7:create_file	2
-../Core/Src/utils.c:412:5:mount_sd	1

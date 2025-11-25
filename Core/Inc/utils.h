@@ -16,8 +16,8 @@ int parse_config(const char *config_str, driver **driver_list,sensor **sensor_li
 				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby);
 
 int parse_command(const char* json_string, int* driver_id, int* direction, driver *driver_list);
-char *read_file(const char *filename);
-char *create_file(const char *filename);
+int read_file(const char *filename, char *data_buffer, size_t buffer_size);
+int create_file(const char *filename);
 int mount_sd(FATFS* FatFs);
 
 

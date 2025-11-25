@@ -10,7 +10,6 @@
 #include <stdlib.h>
 
 static char TxBuffer[300];
-static char buffer[];      // if defined elsewhere
 
 int parse_config(const char *config_str,
                  driver **driver_list,
@@ -199,7 +198,6 @@ int parse_config(const char *config_str,
     if (ignition_obj != NULL) {
     	driver ignition;
         char *gpio_port = cJSON_GetObjectItemCaseSensitive(ignition_obj, "gpio_port")->valuestring;
-        int ign_pin = 0;
         if (strcmp(gpio_port, "GPIOA") == 0) {
             ignition.GPIO_Port = GPIOA;
         } else if (strcmp(gpio_port, "GPIOB") == 0) {
@@ -332,7 +330,7 @@ end:
 
 /* ========== SD + FILE HELPERS WITH TEST PLACEHOLDERS ========== */
 
-char *read_file(const char *filename)
+int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 {
 #ifdef TEST
     /* In TEST mode: skip SD and return a hard-coded config string */
@@ -366,31 +364,35 @@ char *read_file(const char *filename)
 	FRESULT fres;
 	fres = f_open(&fil, filename, FA_READ);
 	   if(fres != FR_OK) {
-		sprintf(buffer,"f_open error (%i)\r\n", fres);
-		HAL_UART_Transmit(&huart2, (uint8_t*)buffer, strlen(buffer), HAL_MAX_DELAY);
-		while (1);
+		sprintf(TxBuffer,"f_open error (%i)\r\n", fres);
+		HAL_UART_Transmit(&huart2, (uint8_t*)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		return -2;
 	   }
 
 	   //get the number of characters to allocate to this string
 	   f_lseek(&fil,SEEK_END);
-	   long size = f_tell(&fil);
-	   char readBuf[size];
+	   long size = f_size(&fil);
 
-	   TCHAR *rres = f_gets((TCHAR*)readBuf,size, &fil);
-	   if(rres != 0) {
-			sprintf(TxBuffer,"Read string from 'test.txt' contents: %s\r\n", readBuf);
-			HAL_UART_Transmit(&huart2, (uint8_t*)TxBuffer, sizeof(*TxBuffer), HAL_MAX_DELAY);
+	   if (size > buffer_size){
+		   sprintf(TxBuffer, "Error: Input buffer size too small \r\n");
+		   HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+		   f_close(&fil);
+		   return -2;
+	   }
 
-	   } else {
-			sprintf(TxBuffer,"f_gets error (%i)\r\n", fres);
-			TxBuffer;
+	   TCHAR *rres = f_gets((TCHAR*)data_buffer,size, &fil);
+	   if(rres == 0) {
+		   sprintf(TxBuffer,"f_gets error (%i)\r\n", fres);
+		   HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+		   f_close(&fil);
+		   return -2;
 	   }
 	   f_close(&fil);
-	   return readBuf;
+	   return 0;
 #endif
 }
 
-char *create_file(const char *filename)
+int create_file(const char *filename)
 {
 #ifdef TEST
     const char msg[] = "[TEST] Not creating file on SD (TEST mode)\r\n";
@@ -401,11 +403,12 @@ char *create_file(const char *filename)
     FRESULT fres;
     fres = f_open(&fil, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
     if (fres != FR_OK) {
-        sprintf(buffer, "f_open error (%i)\r\n", fres);
-        HAL_UART_Transmit(&huart2, (uint8_t *)buffer, strlen(buffer), -1);
+        sprintf(TxBuffer, "f_open error (%i)\r\n", fres);
+        HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+        return -2;
     }
     f_close(&fil);
-    return NULL;
+    return 0;
 #endif
 }
 

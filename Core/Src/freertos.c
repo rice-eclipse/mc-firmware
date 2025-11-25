@@ -25,6 +25,7 @@
 #include "spi.h"
 #include "utils.h"
 #include <string.h>
+#include <stdio.h>
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */

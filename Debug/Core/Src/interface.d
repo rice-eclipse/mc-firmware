@@ -1,4 +1,4 @@
-Core/Src/usart.o: ../Core/Src/usart.c ../Core/Inc/usart.h \
+Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
  ../Core/Inc/main.h ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h \
  ../Core/Inc/stm32f4xx_hal_conf.h \
  ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal_rcc.h \
@@ -43,8 +43,15 @@ Core/Src/usart.o: ../Core/Src/usart.c ../Core/Inc/usart.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/mpu_wrappers.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h \
- ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h
-../Core/Inc/usart.h:
+ ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h \
+ ../FATFS/App/Fatfs.h ../Middlewares/Third_Party/FatFs/src/ff.h \
+ ../Middlewares/Third_Party/FatFs/src/integer.h ../FATFS/Target/ffconf.h \
+ ../Core/Inc/main.h ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h \
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Middlewares/Third_Party/FatFs/src/ff.h ../FATFS/Target/user_diskio.h \
+ ../Core/Inc/utils.h ../FATFS/App/fatfs.h ../Core/Inc/cJSON.h \
+ ../Core/Inc/usart.h
+../Core/Inc/interface.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F4xx_HAL_Driver/Inc/stm32f4xx_hal.h:
 ../Core/Inc/stm32f4xx_hal_conf.h:
@@ -91,3 +98,16 @@ Core/Src/usart.o: ../Core/Src/usart.c ../Core/Inc/usart.h \
 ../Middlewares/Third_Party/FreeRTOS/Source/include/task.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/list.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os2.h:
+../FATFS/App/Fatfs.h:
+../Middlewares/Third_Party/FatFs/src/ff.h:
+../Middlewares/Third_Party/FatFs/src/integer.h:
+../FATFS/Target/ffconf.h:
+../Core/Inc/main.h:
+../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h:
+../Middlewares/Third_Party/FatFs/src/diskio.h:
+../Middlewares/Third_Party/FatFs/src/ff.h:
+../FATFS/Target/user_diskio.h:
+../Core/Inc/utils.h:
+../FATFS/App/fatfs.h:
+../Core/Inc/cJSON.h:
+../Core/Inc/usart.h:

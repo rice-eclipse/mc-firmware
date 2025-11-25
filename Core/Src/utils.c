@@ -107,23 +107,6 @@ int parse_config(const char *config_str,
             }
 
             (*sensor_list)[curr_sensor] = new_sensor;
-#ifdef TEST
-            /* In TEST mode, print sensor config over UART instead of relying on SD */
-            int len = snprintf(
-                TxBuffer,
-                sizeof(TxBuffer),
-                "[TEST] SENSOR %d: name=%s, ch=%d, cs=%d, int=%.3f, slope=%.3f\r\n",
-                curr_sensor,
-                new_sensor.name ? new_sensor.name : "null",
-                new_sensor.channel,
-                new_sensor.adc_cs,
-                new_sensor.calibration_int,
-                new_sensor.calibration_slope
-            );
-            if (len > 0 && len < (int)sizeof(TxBuffer)) {
-                HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-            }
-#endif
             curr_sensor++;
         }
     }
@@ -175,19 +158,6 @@ int parse_config(const char *config_str,
 
 
                 (*driver_list)[curr_driver] = new_driver;
-#ifdef TEST
-                int len = snprintf(
-                    TxBuffer,
-                    sizeof(TxBuffer),
-                    "[TEST] DRIVER %d: port=%s, pin=%u\r\n",
-                    curr_driver,
-                    gpio_port,
-                    (unsigned)new_driver.GPIO_Pin
-                );
-                if (len > 0 && len < (int)sizeof(TxBuffer)) {
-                    HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-                }
-#endif
                 curr_driver++;
             }
         }
@@ -206,18 +176,6 @@ int parse_config(const char *config_str,
             ignition.GPIO_Port = GPIOC;
         }
         ignition.GPIO_Pin = IGN_Pin;
-#ifdef TEST
-        int len = snprintf(
-            TxBuffer,
-            sizeof(TxBuffer),
-            "[TEST] IGNITION: port=%s, pin=%u\r\n",
-            gpio_port,
-            (unsigned)ignition.GPIO_Pin
-        );
-        if (len > 0 && len < (int)sizeof(TxBuffer)) {
-            HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-        }
-#endif
     }
 
     /* monitors */
@@ -256,22 +214,6 @@ int parse_config(const char *config_str,
 						break;
 					}
                 (*monitor_list)[curr_monitor] = new_monitor;
-#ifdef TEST
-                int len = snprintf(
-                    TxBuffer,
-                    sizeof(TxBuffer),
-                    "[TEST] MONITOR %d: name=%s, ch=%d, cs=%d, int=%.3f, slope=%.3f\r\n",
-                    curr_monitor,
-                    new_monitor.name ? new_monitor.name : "null",
-                    new_monitor.channel,
-                    new_monitor.adc_cs,
-                    new_monitor.calibration_int,
-                    new_monitor.calibration_slope
-                );
-                if (len > 0 && len < (int)sizeof(TxBuffer)) {
-                    HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-                }
-#endif
                 curr_monitor++;
             }
         }
@@ -332,34 +274,6 @@ end:
 
 int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 {
-#ifdef TEST
-    /* In TEST mode: skip SD and return a hard-coded config string */
-    static char test_config[] =
-        "{"
-        "\"host\": {\"ip\": \"127.0.0.1\"},"
-        "\"port\": 1234,"
-        "\"sampling_freq_ignition\": 10,"
-        "\"sampling_freq_standby\": 1,"
-        "\"sensors\": ["
-        "  {"
-        "    \"enabled\": \"true\","
-        "    \"sensor\": \"test_sensor\","
-        "    \"channel\": 0,"
-        "    \"adc_cs\": 1,"
-        "    \"calibration_intercept\": 0.0,"
-        "    \"calibration_slope\": 1.0"
-        "  }"
-        "],"
-        "\"drivers\": [],"
-        "\"ignition\": {\"gpio_port\":\"GPIOA\",\"gpio_pin\":0},"
-        "\"monitors\": []"
-        "}";
-
-    const char msg[] = "[TEST] Using built-in config, skipping SD read\r\n";
-    HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-    return test_config;
-#else
-
     FIL fil;
 	FRESULT fres;
 	fres = f_open(&fil, filename, FA_READ);
@@ -389,16 +303,11 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 	   }
 	   f_close(&fil);
 	   return 0;
-#endif
 }
 
 int create_file(const char *filename)
 {
-#ifdef TEST
-    const char msg[] = "[TEST] Not creating file on SD (TEST mode)\r\n";
-    HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-    return NULL;
-#else
+
     FIL fil;
     FRESULT fres;
     fres = f_open(&fil, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
@@ -409,17 +318,10 @@ int create_file(const char *filename)
     }
     f_close(&fil);
     return 0;
-#endif
+
 }
 
 int mount_sd(FATFS *Fatfs)
 {
-#ifdef TEST
-    (void)Fatfs;
-    const char msg[] = "[TEST] Skipping SD mount (TEST mode)\r\n";
-    HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-    return 0;   // pretend success
-#else
     return (f_mount(Fatfs, "", 1));
-#endif
 }

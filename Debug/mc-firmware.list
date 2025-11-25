@@ -27,21 +27,21 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   ALLOC
  11 .ARM.attributes 00000030  00000000  00000000  000182e8  2**0
                   CONTENTS, READONLY
- 12 .debug_info   0002dbc6  00000000  00000000  00018318  2**0
+ 12 .debug_info   0002dbb2  00000000  00000000  00018318  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 13 .debug_abbrev 000070f2  00000000  00000000  00045ede  2**0
+ 13 .debug_abbrev 00007127  00000000  00000000  00045eca  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 14 .debug_aranges 00002768  00000000  00000000  0004cfd0  2**3
+ 14 .debug_aranges 00002768  00000000  00000000  0004cff8  2**3
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 15 .debug_rnglists 00001e7f  00000000  00000000  0004f738  2**0
+ 15 .debug_rnglists 00001e7f  00000000  00000000  0004f760  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_macro  00021b8b  00000000  00000000  000515b7  2**0
+ 16 .debug_macro  00021b6f  00000000  00000000  000515df  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_line   0003465f  00000000  00000000  00073142  2**0
+ 17 .debug_line   00034643  00000000  00000000  0007314e  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000ab689  00000000  00000000  000a77a1  2**0
+ 18 .debug_str    000ab69b  00000000  00000000  000a7791  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  00152e2a  2**0
+ 19 .comment      00000043  00000000  00000000  00152e2c  2**0
                   CONTENTS, READONLY
  20 .debug_frame  0000b790  00000000  00000000  00152e70  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
@@ -5020,7 +5020,7 @@ void StartCmdHandling(void *argument)
     osDelay(1);
  80025dc:	2001      	movs	r0, #1
  80025de:	f00b fd46 	bl	800e06e <osDelay>
-	  osEventFlagsWait(command_event, 0x00000010U, osFlagsWaitAny, osWaitForever);
+  {
  80025e2:	bf00      	nop
  80025e4:	e7ea      	b.n	80025bc <StartCmdHandling+0x8>
  80025e6:	bf00      	nop
@@ -7575,11 +7575,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
  80034d8:	c50f      	stmia	r5!, {r0, r1, r2, r3}
  80034da:	6823      	ldr	r3, [r4, #0]
  80034dc:	602b      	str	r3, [r5, #0]
-            );
-            if (len > 0 && len < (int)sizeof(TxBuffer)) {
-                HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-            }
-#endif
             curr_sensor++;
  80034de:	f8d7 30a4 	ldr.w	r3, [r7, #164]	@ 0xa4
  80034e2:	3301      	adds	r3, #1
@@ -7773,11 +7768,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
  800365c:	f107 0330 	add.w	r3, r7, #48	@ 0x30
  8003660:	e893 0003 	ldmia.w	r3, {r0, r1}
  8003664:	e882 0003 	stmia.w	r2, {r0, r1}
-                );
-                if (len > 0 && len < (int)sizeof(TxBuffer)) {
-                    HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-                }
-#endif
                 curr_driver++;
  8003668:	f8d7 30a0 	ldr.w	r3, [r7, #160]	@ 0xa0
  800366c:	3301      	adds	r3, #1
@@ -7841,8 +7831,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
         ignition.GPIO_Pin = IGN_Pin;
  80036d6:	f44f 7300 	mov.w	r3, #512	@ 0x200
  80036da:	85bb      	strh	r3, [r7, #44]	@ 0x2c
-        }
-#endif
     }
 
     /* monitors */
@@ -8008,11 +7996,6 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
  800380c:	c50f      	stmia	r5!, {r0, r1, r2, r3}
  800380e:	e894 0003 	ldmia.w	r4, {r0, r1}
  8003812:	e885 0003 	stmia.w	r5, {r0, r1}
-                );
-                if (len > 0 && len < (int)sizeof(TxBuffer)) {
-                    HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, len, HAL_MAX_DELAY);
-                }
-#endif
                 curr_monitor++;
  8003816:	f8d7 309c 	ldr.w	r3, [r7, #156]	@ 0x9c
  800381a:	3301      	adds	r3, #1
@@ -8249,9 +8232,6 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
  80039cc:	f507 7314 	add.w	r3, r7, #592	@ 0x250
  80039d0:	f5a3 7313 	sub.w	r3, r3, #588	@ 0x24c
  80039d4:	601a      	str	r2, [r3, #0]
-    return test_config;
-#else
-
     FIL fil;
 	FRESULT fres;
 	fres = f_open(&fil, filename, FA_READ);
@@ -8369,7 +8349,6 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
  8003ad8:	f009 fdfc 	bl	800d6d4 <f_close>
 	   return 0;
  8003adc:	2300      	movs	r3, #0
-#endif
 }
  8003ade:	4618      	mov	r0, r3
  8003ae0:	f507 7714 	add.w	r7, r7, #592	@ 0x250
@@ -8391,9 +8370,7 @@ int create_file(const char *filename)
  8003b04:	f507 7310 	add.w	r3, r7, #576	@ 0x240
  8003b08:	f5a3 730f 	sub.w	r3, r3, #572	@ 0x23c
  8003b0c:	6018      	str	r0, [r3, #0]
-    HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-    return NULL;
-#else
+
     FIL fil;
     FRESULT fres;
     fres = f_open(&fil, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
@@ -8434,7 +8411,7 @@ int create_file(const char *filename)
  8003b60:	f009 fdb8 	bl	800d6d4 <f_close>
     return 0;
  8003b64:	2300      	movs	r3, #0
-#endif
+
 }
  8003b66:	4618      	mov	r0, r3
  8003b68:	f507 7710 	add.w	r7, r7, #576	@ 0x240
@@ -8452,18 +8429,12 @@ int mount_sd(FATFS *Fatfs)
  8003b7e:	b082      	sub	sp, #8
  8003b80:	af00      	add	r7, sp, #0
  8003b82:	6078      	str	r0, [r7, #4]
-    (void)Fatfs;
-    const char msg[] = "[TEST] Skipping SD mount (TEST mode)\r\n";
-    HAL_UART_Transmit(&huart2, (uint8_t *)msg, sizeof(msg) - 1, HAL_MAX_DELAY);
-    return 0;   // pretend success
-#else
     return (f_mount(Fatfs, "", 1));
  8003b84:	2201      	movs	r2, #1
  8003b86:	4904      	ldr	r1, [pc, #16]	@ (8003b98 <mount_sd+0x1c>)
  8003b88:	6878      	ldr	r0, [r7, #4]
  8003b8a:	f008 ffe3 	bl	800cb54 <f_mount>
  8003b8e:	4603      	mov	r3, r0
-#endif
 }
  8003b90:	4618      	mov	r0, r3
  8003b92:	3708      	adds	r7, #8

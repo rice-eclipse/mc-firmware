@@ -23,7 +23,7 @@
 #include "main.h"
 #include "cmsis_os.h"
 #include "spi.h"
-#include "utils.h"
+#include "interface.h"
 #include <string.h>
 #include <stdio.h>
 

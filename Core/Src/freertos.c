@@ -52,7 +52,6 @@
 static char TxBuffer[300];
 osMessageQueueId_t sensorData_queue;
 osStatus_t queue_status;
-int sensor_count;
 uint32_t samplingPeriod_ticks;
 osTimerId_t sampling_timer;
 osEventFlagsId_t sampling_event;

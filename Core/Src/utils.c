@@ -12,13 +12,16 @@
 static char TxBuffer[300];
 
 int parse_config(const char *config_str,
-                 driver **driver_list,
-                 sensor **sensor_list,
-                 monitor **monitor_list,
+                 driver *driver_list,
+                 sensor *sensor_list,
+                 monitor *monitor_list,
                  char *host_ip,
                  int *port,
                  int *sampling_freq_ign,
-                 int *sampling_freq_standby)
+                 int *sampling_freq_standby,
+				 int *driver_count,
+				 int *sensor_count,
+				 int *monitor_count)
 {
     const cJSON *host = NULL;
     const cJSON *host_children = NULL;
@@ -73,8 +76,13 @@ int parse_config(const char *config_str,
         goto end;
     }
 
-    int sensor_count = cJSON_GetArraySize(sensors);
-    *sensor_list = (sensor *)malloc(sensor_count*sizeof(sensor));
+
+    int num_sensors = cJSON_GetArraySize(sensors);
+    if (num_sensors > MAX_SENSOR_COUNT){
+    	sprintf(TxBuffer,"config has too many sensors");
+    	HAL_UART_Transmit(TxBuffer, (uint8_t *)TxBuffer,strlen(TxBuffer),-1);
+    	return -2;
+    }
     int curr_sensor = 0;
 
     int cs_pin =0;
@@ -106,16 +114,23 @@ int parse_config(const char *config_str,
             	break;
             }
 
-            (*sensor_list)[curr_sensor] = new_sensor;
+            sensor_list[curr_sensor] = new_sensor;
             curr_sensor++;
         }
     }
+    //update the sensor count with the true number of sensors
+    *sensor_count = curr_sensor;
 
     /* get all the driver information */
     drivers = cJSON_GetObjectItemCaseSensitive(config_json, "drivers");
     if (cJSON_IsArray(drivers)) {
-        int driver_count = cJSON_GetArraySize(drivers);
-        *driver_list = (driver *)malloc(driver_count * sizeof(driver));
+        int num_drivers = cJSON_GetArraySize(drivers);
+        if (num_drivers > MAX_DRIVER_COUNT){
+        	sprintf(TxBuffer, "config has too many drivers");
+        	HAL_UART_Transmit(TxBuffer, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+        	return -2;
+        }
+
         int curr_driver = 0;
 
         int gpio_pin = 0;
@@ -157,10 +172,12 @@ int parse_config(const char *config_str,
                 }
 
 
-                (*driver_list)[curr_driver] = new_driver;
+                driver_list[curr_driver] = new_driver;
                 curr_driver++;
             }
         }
+        //update the driver count with the true number of drivers
+        *driver_count = curr_driver;
     }
 
     /* ignition config */
@@ -181,8 +198,12 @@ int parse_config(const char *config_str,
     /* monitors */
     monitors = cJSON_GetObjectItemCaseSensitive(config_json, "monitors");
     if (cJSON_IsArray(monitors)) {
-        int monitor_count = cJSON_GetArraySize(monitors);
-        *monitor_list = (monitor *)malloc(monitor_count * sizeof(monitor));
+        int num_monitors = cJSON_GetArraySize(monitors);
+        if (num_monitors > MAX_MONITOR_COUNT){
+               	sprintf(TxBuffer, "config has too many monitors");
+               	HAL_UART_Transmit(TxBuffer, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+               	return -2;
+               }
         int curr_monitor = 0;
 
         int cs_pin = 0;
@@ -213,10 +234,12 @@ int parse_config(const char *config_str,
 						new_monitor.adc_cs = ADC3_CS_Pin;
 						break;
 					}
-                (*monitor_list)[curr_monitor] = new_monitor;
+                monitor_list[curr_monitor] = new_monitor;
                 curr_monitor++;
             }
         }
+        //update the monitor count with the true number of monitors
+        *monitor_count = curr_monitor;
     }
 
 end:

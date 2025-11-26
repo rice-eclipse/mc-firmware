@@ -75,76 +75,6 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
 
 	const char *config_str2 =
-				    "{"
-				    "\"host\": {\"ip\": \"127.0.0.1\"},"
-				    "\"port\": 1234,"
-				    "\"sampling_freq_ignition\": 10,"
-				    "\"sampling_freq_standby\": 1,"
-				    "\"sensors\": ["
-				    "  {"
-				    "    \"sensor\": \"tc1:ox_tank\","
-				    "    \"channel\": 2,"
-				    "    \"adc_cs\": 1,"
-				    "    \"calibration_intercept\": 32,"
-				    "    \"calibration_slope\": 1.8,"
-				    "    \"enabled\": \"true\""
-				    "  },"
-				    "  {"
-				    "    \"sensor\": \"tc2:combustion_chamber\","
-				    "    \"channel\": 3,"
-				    "    \"adc_cs\": 1,"
-				    "    \"calibration_intercept\": 32,"
-				    "    \"calibration_slope\": 1.8,"
-				    "    \"enabled\": \"true\""
-				    "  },"
-				    "  {"
-				    "    \"sensor\": \"pt1:combustion_chamber\","
-				    "    \"channel\": 6,"
-				    "    \"adc_cs\": 2,"
-				    "    \"calibration_intercept\": 0.4664,"
-				    "    \"calibration_slope\": 0.0019,"
-				    "    \"enabled\": \"true\""
-				    "  }"
-				    "],"
-				    "\"drivers\": ["
-				    "  {"
-				    "    \"driver\": \"D1: Ox Fill\","
-				    "    \"gpio_pin\": 23,"
-				    "    \"gpio_port\": \"GPIOB\","
-				    "    \"enabled\": \"true\""
-				    "  },"
-				    "  {"
-				    "    \"driver\": \"D2: Ground Vent\","
-				    "    \"gpio_pin\": 27,"
-				    "    \"gpio_port\": \"GPIOB\","
-				    "    \"enabled\": \"true\""
-				    "  },"
-				    "  {"
-				    "    \"driver\": \"D3: Ops Pneumatic\","
-				    "    \"gpio_pin\": 19,"
-				    "    \"gpio_port\": \"GPIOB\","
-				    "    \"enabled\": \"true\""
-				    "  },"
-				    "  {"
-				    "    \"driver\": \"D4: Engine Vent\","
-				    "    \"gpio_pin\": 12,"
-				    "    \"gpio_port\": \"GPIOB\","
-				    "    \"enabled\": \"true\""
-				    "  }"
-				    "],"
-				    "\"ignition\": {\"gpio_port\": \"GPIOA\", \"gpio_pin\": 0},"
-				    "\"monitors\": ["
-				    "  {"
-				    "    \"monitor\": \"battery current\","
-				    "    \"channel\": 0,"
-				    "    \"adc_cs\": 3,"
-				    "    \"calibration_slope\": 1,"
-				    "    \"calibration_intercept\": 0,"
-				    "    \"sample_rate\": 1,"
-				    "    \"enabled\": \"true\""
-				    "  },"
-				    "  {"
-				    "    \"monitor\": \static char test_config[] =
         "{"
         "\"host\": {\"ip\": \"127.0.0.1\"},"
         "\"port\": 1234,"
@@ -193,10 +123,12 @@ int mount_sd_interface(FATFS* FatFs){
 /******************************************************************************************/
 /*actual implementations*/
 /******************************************************************************************/
-int parse_config_interface(const char *config_str, driver **driver_list,sensor **sensor_list,monitor **monitor_list,
-				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby){
+int parse_config_interface(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list,
+				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby,
+				 int *driver_count, int *sensor_count, int *monitor_count){
 	return parse_config(config_str, driver_list, sensor_list, monitor_list,
-					 host_ip, port, sampling_freq_ign, sampling_freq_standby);
+					 host_ip, port, sampling_freq_ign, sampling_freq_standby,
+					 driver_count, sensor_count, monitor_count);
 
 }
 

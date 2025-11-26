@@ -12,8 +12,9 @@
 #include "cJSON.h"
 #include "usart.h"
 
-int parse_config(const char *config_str, driver **driver_list,sensor **sensor_list,monitor **monitor_list,
-				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby);
+int parse_config(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list,
+				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby,
+				 int *driver_count, int *sensor_count, int *monitor_count);
 
 int parse_command(const char* json_string, int* driver_id, int* direction, driver *driver_list);
 int read_file(const char *filename, char *data_buffer, size_t buffer_size);

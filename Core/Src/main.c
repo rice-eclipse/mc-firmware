@@ -25,7 +25,7 @@
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
-
+#include "interface.h"
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -50,9 +50,8 @@
 
 /* USER CODE BEGIN PV */
 static char TxBuffer[300];
+static char config_str[4000];
 FATFS FatFs; 	//Fatfs handle
-const char *cmd_prototype =
-	"{\"type\": \"actuate\", \"driver-id\": 0, \"direction\": 1}";
 char RxBuffer[52];
 /* USER CODE END PV */
 
@@ -65,17 +64,22 @@ void MX_FREERTOS_Init(void);
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-sensor *sensor_list = NULL;
-driver *driver_list = NULL;
-monitor *monitor_list = NULL;
-char *host_ip = NULL;
 int port = 0;
 int sampling_freq_ign = 0;
 int sampling_freq_standby = 0;
 char *console_filename = NULL;
 char *data_filename = NULL;
 char *cmd_buffer = NULL;
+char host_ip[MAX_IP_LEN];
 osEventFlagsId_t command_event;
+int sensor_count = MAX_SENSOR_COUNT;
+int driver_count = MAX_DRIVER_COUNT;
+int monitor_count = MAX_MONITOR_COUNT;
+driver driver_list[MAX_DRIVER_COUNT];
+monitor monitor_list[MAX_MONITOR_COUNT];
+sensor sensor_list[MAX_SENSOR_COUNT];
+//intialize driver, sensor, and monitor lists
+
 
 /* USER CODE END 0 */
 
@@ -87,7 +91,6 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
 
   /* USER CODE END 1 */
 
@@ -121,7 +124,7 @@ int main(void)
   /*end initialize */
 
   /*Mount the sd card to read information from it*/
-  FRESULT fres = mount_sd(&FatFs);
+  FRESULT fres = mount_sd_interface(&FatFs);
   if (fres != FR_OK){
 	  sprintf(TxBuffer,"f_mount error (%i)\r\n", fres);
 	  HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -130,10 +133,11 @@ int main(void)
 
   /*parse the configuration file to get the available
 	sensors and drivers*/
-  const char *config_str = read_file("config.json");
-  parse_config(config_str, &driver_list, &sensor_list, &monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby);
-  data_filename = create_file("data.csv");
-  console_filename = create_file("console.log");
+  read_file_interface("config.json", config_str,4000);
+  parse_config_interface(config_str, driver_list, sensor_list, monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby,
+		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
+  create_file_interface("data.csv");
+  create_file_interface("console.log");
   //wait for command
   //HAL_UART_Receive_IT(&huart2,(uint8_t *) RxBuffer, strlen(cmd_prototype));
   /* USER CODE END 2 */
@@ -208,7 +212,7 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart) {
-	HAL_UART_Receive_IT(&huart2, (uint8_t *)RxBuffer, strlen(cmd_prototype));
+	HAL_UART_Receive_IT(&huart2, (uint8_t *)RxBuffer, 52);
 	cmd_buffer = RxBuffer;
 	osEventFlagsSet(command_event,  0x00000010U);
 }

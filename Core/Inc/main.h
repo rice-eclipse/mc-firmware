@@ -62,10 +62,15 @@ typedef struct{
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
-extern sensor *sensor_list;
-extern driver *driver_list;
-extern monitor *monitor_list;
-extern char *host_ip;
+#define MAX_DRIVER_COUNT 6
+#define MAX_SENSOR_COUNT 12
+#define MAX_MONITOR_COUNT 7
+#define MAX_IP_LEN 16
+
+extern sensor sensor_list[MAX_SENSOR_COUNT];
+extern driver driver_list[MAX_DRIVER_COUNT];
+extern monitor monitor_list[MAX_MONITOR_COUNT];
+extern char host_ip[MAX_IP_LEN];
 extern int port;
 extern int sampling_freq_ign;
 extern int sampling_freq_standby;
@@ -73,7 +78,9 @@ extern char *cmd_buffer;
 extern char *console_filename;
 extern char *data_filename;
 extern osEventFlagsId_t command_event;
-
+extern int sensor_count;
+extern int driver_count;
+extern int monitor_count;
 
 /* USER CODE END EC */
 

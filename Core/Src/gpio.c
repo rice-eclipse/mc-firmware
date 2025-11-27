@@ -51,20 +51,29 @@ void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOC, SD_CS_Pin|ADC3_CS_Pin|ADC2_CS_Pin|ADC1_CS_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOC, GPIO_PIN_0|SD_CS_Pin|ADC3_CS_Pin|ADC2_CS_Pin
+                          |ADC1_CS_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(LD2_GPIO_Port, LD2_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, DRV0_Pin|DRV1_Pin|DRV2_Pin|DRV3_Pin
-                          |DRV4_Pin|IGN_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, IGN_Pin|DRV0_Pin|DRV1_Pin|DRV2_Pin
+                          |DRV3_Pin|DRV4_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pins : SD_CS_Pin ADC3_CS_Pin ADC2_CS_Pin ADC1_CS_Pin */
-  GPIO_InitStruct.Pin = SD_CS_Pin|ADC3_CS_Pin|ADC2_CS_Pin|ADC1_CS_Pin;
+  /*Configure GPIO pins : PC0 SD_CS_Pin ADC3_CS_Pin ADC2_CS_Pin
+                           ADC1_CS_Pin */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|SD_CS_Pin|ADC3_CS_Pin|ADC2_CS_Pin
+                          |ADC1_CS_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
+
+  /*Configure GPIO pin : PC3 */
+  GPIO_InitStruct.Pin = GPIO_PIN_3;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
   /*Configure GPIO pin : LD2_Pin */
@@ -74,10 +83,10 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(LD2_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : DRV0_Pin DRV1_Pin DRV2_Pin DRV3_Pin
-                           DRV4_Pin IGN_Pin */
-  GPIO_InitStruct.Pin = DRV0_Pin|DRV1_Pin|DRV2_Pin|DRV3_Pin
-                          |DRV4_Pin|IGN_Pin;
+  /*Configure GPIO pins : IGN_Pin DRV0_Pin DRV1_Pin DRV2_Pin
+                           DRV3_Pin DRV4_Pin */
+  GPIO_InitStruct.Pin = IGN_Pin|DRV0_Pin|DRV1_Pin|DRV2_Pin
+                          |DRV3_Pin|DRV4_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;

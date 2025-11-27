@@ -99,20 +99,16 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define SD_CS_Pin GPIO_PIN_1
 #define SD_CS_GPIO_Port GPIOC
-#define SD_MISO_Pin GPIO_PIN_2
-#define SD_MISO_GPIO_Port GPIOC
-#define SD_MOSI_Pin GPIO_PIN_3
-#define SD_MOSI_GPIO_Port GPIOC
 #define USART_TX_Pin GPIO_PIN_2
 #define USART_TX_GPIO_Port GPIOA
 #define USART_RX_Pin GPIO_PIN_3
 #define USART_RX_GPIO_Port GPIOA
 #define LD2_Pin GPIO_PIN_5
 #define LD2_GPIO_Port GPIOA
-#define SD_SCK_Pin GPIO_PIN_10
-#define SD_SCK_GPIO_Port GPIOB
 #define ADC_SCK_Pin GPIO_PIN_12
 #define ADC_SCK_GPIO_Port GPIOB
+#define IGN_Pin GPIO_PIN_13
+#define IGN_GPIO_Port GPIOB
 #define ADC3_CS_Pin GPIO_PIN_8
 #define ADC3_CS_GPIO_Port GPIOC
 #define ADC2_CS_Pin GPIO_PIN_9
@@ -129,18 +125,16 @@ void Error_Handler(void);
 #define ADC_MOSI_GPIO_Port GPIOC
 #define SWO_Pin GPIO_PIN_3
 #define SWO_GPIO_Port GPIOB
-#define DRV0_Pin GPIO_PIN_4
+#define DRV0_Pin GPIO_PIN_5
 #define DRV0_GPIO_Port GPIOB
-#define DRV1_Pin GPIO_PIN_5
+#define DRV1_Pin GPIO_PIN_6
 #define DRV1_GPIO_Port GPIOB
-#define DRV2_Pin GPIO_PIN_6
+#define DRV2_Pin GPIO_PIN_7
 #define DRV2_GPIO_Port GPIOB
-#define DRV3_Pin GPIO_PIN_7
+#define DRV3_Pin GPIO_PIN_8
 #define DRV3_GPIO_Port GPIOB
-#define DRV4_Pin GPIO_PIN_8
+#define DRV4_Pin GPIO_PIN_9
 #define DRV4_GPIO_Port GPIOB
-#define IGN_Pin GPIO_PIN_9
-#define IGN_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 

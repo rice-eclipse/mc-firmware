@@ -22,10 +22,13 @@
 #include "task.h"
 #include "main.h"
 #include "cmsis_os.h"
+#include "fatfs.h"
 #include "spi.h"
-#include "interface.h"
-#include <string.h>
+#include "mcp3208.h"
 #include <stdio.h>
+#include <string.h>
+#include "interface.h"
+
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
@@ -226,7 +229,7 @@ void StartCmdHandling(void *argument)
   {
 	//get command from user
 	  osEventFlagsWait(command_event, 0x00000010U, osFlagsWaitAny, osWaitForever);
-	  parse_command(cmd_buffer, &driver_id, &direction, driver_list);
+	  parse_command_interface(cmd_buffer, &driver_id, &direction, driver_list);
     osDelay(1);
   }
   /* USER CODE END StartCmdHandling */

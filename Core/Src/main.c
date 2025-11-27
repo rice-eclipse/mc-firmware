@@ -21,11 +21,12 @@
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "rtc.h"
+#include "sdio.h"
 #include "spi.h"
 #include "usart.h"
 #include "usb_device.h"
 #include "gpio.h"
-#include "interface.h"
+
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
 
@@ -113,10 +114,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART2_UART_Init();
-  MX_SPI2_Init();
   MX_SPI3_Init();
   MX_FATFS_Init();
   MX_RTC_Init();
+  MX_SDIO_SD_Init();
   /* USER CODE BEGIN 2 */
 
   /*Initialize all global variables */

@@ -18,10 +18,13 @@ static char TxBuffer[300];
 /******************************************************************************************/
 
 /*Config parsing doesn't depend on any hardware*/
-int parse_config_interface(const char *config_str, driver **driver_list,sensor **sensor_list,monitor **monitor_list,
-				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby){
-	parse_config(config_str, driver_list, sensor_list, monitor_list,
-					 host_ip, port, sampling_freq_ign, sampling_freq_standby);
+int parse_config_interface(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list,
+				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby,
+				 int *driver_count, int *sensor_count, int *monitor_count){
+	return parse_config(config_str, driver_list, sensor_list, monitor_list,
+					 host_ip, port, sampling_freq_ign, sampling_freq_standby,
+					 driver_count, sensor_count, monitor_count);
+
 
 }
 
@@ -70,7 +73,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 		cJSON_Delete(cmd);
 		return status;
 	}
-}
+
 
 int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
 
@@ -115,7 +118,7 @@ int create_file_interface(const char *filename){
 
 int mount_sd_interface(FATFS* FatFs){
 	sprintf(TxBuffer, "Mounted sd \r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1)
+	HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
 	return 0;
 }
 #else

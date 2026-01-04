@@ -36,11 +36,51 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+typedef struct {
+	char* name;
+	int channel;
+	uint16_t adc_cs;
+	float calibration_slope;
+	float calibration_int;
+} sensor;
 
+typedef struct {
+	GPIO_TypeDef *GPIO_Port;
+	uint16_t GPIO_Pin;
+} driver;
+
+typedef struct{
+	char* name;
+	int channel;
+	uint16_t adc_cs;
+	float calibration_slope;
+	float calibration_int;
+	int sample_rate;
+} monitor;
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+#define MAX_DRIVER_COUNT 6
+#define MAX_SENSOR_COUNT 12
+#define MAX_MONITOR_COUNT 7
+#define MAX_IP_LEN 16
+#define FIR_LENGTH 16
+
+
+extern sensor sensor_list[MAX_SENSOR_COUNT];
+extern driver driver_list[MAX_DRIVER_COUNT];
+extern monitor monitor_list[MAX_MONITOR_COUNT];
+extern char host_ip[MAX_IP_LEN];
+extern int port;
+extern int sampling_freq_ign;
+extern int sampling_freq_standby;
+extern char *cmd_buffer;
+extern char *console_filename;
+extern char *data_filename;
+extern int sensor_count;
+extern int driver_count;
+extern int monitor_count;
 
 /* USER CODE END EC */
 
@@ -101,6 +141,8 @@ void Error_Handler(void);
 #define TMS_GPIO_Port GPIOA
 #define TCK_Pin GPIO_PIN_14
 #define TCK_GPIO_Port GPIOA
+#define Detect_SDIO_Pin GPIO_PIN_1
+#define Detect_SDIO_GPIO_Port GPIOD
 #define RMII_TX_EN_Pin GPIO_PIN_11
 #define RMII_TX_EN_GPIO_Port GPIOG
 #define RMII_TXD0_Pin GPIO_PIN_13

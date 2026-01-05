@@ -9,6 +9,7 @@
 #include <string.h>
 #include "utils.h"
 #include <stdio.h>
+#include "adc.h"
 
 #ifdef TEST_LOGIC
 
@@ -78,25 +79,39 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
 
 	const char *config_str2 =
-        "{"
-        "\"host\": {\"ip\": \"127.0.0.1\"},"
-        "\"port\": 1234,"
-        "\"sampling_freq_ignition\": 10,"
-        "\"sampling_freq_standby\": 1,"
-        "\"sensors\": ["
-        "  {"
-        "    \"enabled\": \"true\","
-        "    \"sensor\": \"test_sensor\","
-        "    \"channel\": 0,"
-        "    \"adc_cs\": 1,"
-        "    \"calibration_intercept\": 0.0,"
-        "    \"calibration_slope\": 1.0"
-        "  }"
-        "],"
-        "\"drivers\": [],"
-        "\"ignition\": {\"gpio_port\":\"GPIOA\",\"gpio_pin\":0},"
-        "\"monitors\": []"
-        "}";
+			"{"
+			"\"host\": {\"ip\": \"127.0.0.1\"},"
+			"\"port\": 1234,"
+			"\"sampling_freq_ignition\": 10,"
+			"\"sampling_freq_standby\": 1,"
+			"\"sensors\": ["
+			"  {"
+			"    \"sensor\": \"tc1:ox_tank\","
+			"    \"channel\": 2,"
+			"    \"adc_cs\": 1,"
+			"    \"calibration_intercept\": 32,"
+			"    \"calibration_slope\": 1.8,"
+			"    \"enabled\": \"true\""
+			"  },"
+			"  {"
+			"    \"sensor\": \"tc2:combustion_chamber\","
+			"    \"channel\": 3,"
+			"    \"adc_cs\": 1,"
+			"    \"calibration_intercept\": 32,"
+			"    \"calibration_slope\": 1.8,"
+			"    \"enabled\": \"true\""
+			"  },"
+			"  {"
+			"    \"sensor\": \"pt1:combustion_chamber\","
+			"    \"channel\": 6,"
+			"    \"adc_cs\": 2,"
+			"    \"calibration_intercept\": 0.4664,"
+			"    \"calibration_slope\": 0.0019,"
+			"    \"enabled\": \"true\""
+			"  }"
+			"]"
+			"}";
+
 
 	int config_len = strlen(config_str2);
 	if (config_len > buffer_size){
@@ -122,7 +137,17 @@ int mount_sd_interface(FATFS* FatFs){
 	return 0;
 }
 float get_sensorval_interface(sensor *current_sensor){
-	return current_sensor->calibration_slope;
+	uint16_t adc_val =0;
+	static float sensor_val = 0;
+	HAL_ADC_Start(&hadc1);
+	if (HAL_ADC_PollForConversion(&hadc1,100) == HAL_OK){
+		adc_val = HAL_ADC_GetValue(&hadc1);
+		sensor_val = (adc_val*current_sensor->calibration_slope) + current_sensor->calibration_int;
+	}
+	else{
+		sensor_val = 0;
+	}
+	return sensor_val;
 }
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count){
 	return;

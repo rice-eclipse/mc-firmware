@@ -90,7 +90,7 @@ int parse_config(const char *config_str,
         char *enabled = cJSON_GetObjectItemCaseSensitive(sensor_obj, "enabled")->valuestring;
         if (strcmp(enabled,"true") == 0) {
             sensor new_sensor;
-            new_sensor.name = cJSON_GetObjectItemCaseSensitive(sensor_obj, "sensor")->valuestring;
+            new_sensor.name = strdup(cJSON_GetObjectItemCaseSensitive(sensor_obj, "sensor")->valuestring);
             new_sensor.channel = cJSON_GetObjectItemCaseSensitive(sensor_obj, "channel")->valueint;
             cs_pin = cJSON_GetObjectItemCaseSensitive(sensor_obj, "adc_cs")->valueint;
             new_sensor.calibration_int =
@@ -209,7 +209,7 @@ int parse_config(const char *config_str,
             char *enabled = cJSON_GetObjectItemCaseSensitive(monitor_obj, "enabled")->valuestring;
             if (strcmp(enabled,"true")) {
                 monitor new_monitor;
-                new_monitor.name = cJSON_GetObjectItemCaseSensitive(monitor_obj, "monitor")->valuestring;
+                new_monitor.name = strdup(cJSON_GetObjectItemCaseSensitive(monitor_obj, "monitor")->valuestring);
                 new_monitor.channel = cJSON_GetObjectItemCaseSensitive(monitor_obj, "channel")->valueint;
                 cs_pin = cJSON_GetObjectItemCaseSensitive(monitor_obj, "adc_cs")->valueint;
                 new_monitor.calibration_int =

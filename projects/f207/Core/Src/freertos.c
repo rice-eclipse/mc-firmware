@@ -146,8 +146,8 @@ void StartCollectionTask(void *argument)
   for(;;)
   {
 	  sampling_flag = osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
-	 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count]);
-	 //sample_count = (sample_count + 1) % (sensor_count*2);
+	 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
+	 sample_count = (sample_count + 1) % (sensor_count*2);
 
 	 //First Buffer has been filled
 	 if (sample_count == sensor_count){

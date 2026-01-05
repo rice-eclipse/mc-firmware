@@ -10,7 +10,7 @@
 
 #include "main.h"
 #include "Fatfs.h"
-
+#include "utils.h"
 int parse_config_interface(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list,
 				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby,
 				 int *driver_count, int *sensor_count, int *monitor_count);

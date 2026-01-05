@@ -25,11 +25,14 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include "usart.h"
 #include "interface.h"
+#include "tim.h"
+#include "gpio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -60,15 +63,15 @@ char tx_buffer[300];
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
   .name = "collectionTask",
-  .stack_size = 128 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for processingTask */
 osThreadId_t processingTaskHandle;
 const osThreadAttr_t processingTask_attributes = {
   .name = "processingTask",
-  .stack_size = 128 * 4,
-  .priority = (osPriority_t) osPriorityNormal,
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -88,7 +91,6 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-	float sensorVals = {0};
 
   /* USER CODE END Init */
 
@@ -120,7 +122,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
+
   /* USER CODE END RTOS_EVENTS */
 
 }
@@ -137,23 +139,24 @@ void MX_FREERTOS_Init(void) {
 void StartCollectionTask(void *argument)
 {
   /* USER CODE BEGIN StartCollectionTask */
+	 HAL_TIM_Base_Start_IT(&htim14);
 	int sample_count = 0;
 	uint32_t sampling_flag;
   /* Infinite loop */
   for(;;)
   {
 	  sampling_flag = osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
-	 sensor_vals[sample_count] = get_sensorval_interface(&sensorList[sample_count]);
-	 sample_count = (sample_count + 1) % (MAX_SENSOR_COUNT*2);
+	 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count]);
+	 //sample_count = (sample_count + 1) % (sensor_count*2);
 
 	 //First Buffer has been filled
-	 if (sample_count == MAX_SENSOR_COUNT){
+	 if (sample_count == sensor_count){
 		 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
 	 }
 	 else if (sample_count == 0){
 		 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 	 }
-    osDelay(1);
+	 osDelay(100);
   }
   /* USER CODE END StartCollectionTask */
 }
@@ -180,17 +183,17 @@ void StartProcessingTask(void *argument)
 		  current_buffer = &sensor_vals[0];
 	  }
 	  else if (processing_flag & SECOND_BUF_READY){
-		  current_buffer = &sensor_vals[MAX_SENSOR_COUNT];
+		  current_buffer = &sensor_vals[sensor_count];
 	  }
 	  //performs the filtering and decimation of the data
-	  filter_and_decimate_interface(current_buffer, MAX_SENSOR_COUNT);
+	  filter_and_decimate_interface(current_buffer, sensor_count);
 	  //writes the data to SD card
-	  for (int i = 0; i < MAX_SENSOR_COUNT; i++){
-		  sprintf(tx_buffer, "Sensor %s value: %d\r\n", sensor_list[i].name,
+	  for (int i = 0; i < sensor_count; i++){
+		  sprintf(tx_buffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
 				  	  	  	  	  	  	  	  	  	   current_buffer[i]);
 		  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
 	  }
-    osDelay(1);
+	  osDelay(100);
   }
   /* USER CODE END StartProcessingTask */
 }
@@ -202,7 +205,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /* USER CODE BEGIN Callback 0 */
 
   /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM13)
+  if (htim->Instance == TIM7)
   {
     HAL_IncTick();
   }
@@ -210,6 +213,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM14){
 	  /*sampling event has occured*/
 	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
+	  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
   }
 
   /* USER CODE END Callback 1 */

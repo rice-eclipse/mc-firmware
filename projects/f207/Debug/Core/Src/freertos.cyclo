@@ -1,0 +1,4 @@
+../Core/Src/freertos.c:92:6:MX_FREERTOS_Init	1
+../Core/Src/freertos.c:139:6:StartCollectionTask	3
+../Core/Src/freertos.c:171:6:StartProcessingTask	4
+../Core/Src/freertos.c:203:6:HAL_TIM_PeriodElapsedCallback	3

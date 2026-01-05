@@ -80,7 +80,7 @@ int parse_config(const char *config_str,
     int num_sensors = cJSON_GetArraySize(sensors);
     if (num_sensors > MAX_SENSOR_COUNT){
     	sprintf(TxBuffer,"config has too many sensors");
-    	HAL_UART_Transmit(TxBuffer, (uint8_t *)TxBuffer,strlen(TxBuffer),-1);
+    	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer,strlen(TxBuffer),HAL_MAX_DELAY);
     	return -2;
     }
     int curr_sensor = 0;
@@ -105,12 +105,10 @@ int parse_config(const char *config_str,
             case 2:
             	new_sensor.adc_cs = ADC2_CS_Pin;
             	break;
-            case 3:
-            	new_sensor.adc_cs = ADC3_CS_Pin;
             	break;
             //need to do some error handling here
             default:
-            	new_sensor.adc_cs = ADC3_CS_Pin;
+            	new_sensor.adc_cs = ADC2_CS_Pin;
             	break;
             }
 
@@ -127,7 +125,7 @@ int parse_config(const char *config_str,
         int num_drivers = cJSON_GetArraySize(drivers);
         if (num_drivers > MAX_DRIVER_COUNT){
         	sprintf(TxBuffer, "config has too many drivers");
-        	HAL_UART_Transmit(TxBuffer, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+        	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),HAL_MAX_DELAY);
         	return -2;
         }
 
@@ -201,7 +199,7 @@ int parse_config(const char *config_str,
         int num_monitors = cJSON_GetArraySize(monitors);
         if (num_monitors > MAX_MONITOR_COUNT){
                	sprintf(TxBuffer, "config has too many monitors");
-               	HAL_UART_Transmit(TxBuffer, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+               	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),HAL_MAX_DELAY);
                	return -2;
                }
         int curr_monitor = 0;
@@ -226,12 +224,9 @@ int parse_config(const char *config_str,
 					case 2:
 						new_monitor.adc_cs = ADC2_CS_Pin;
 						break;
-					case 3:
-						new_monitor.adc_cs = ADC3_CS_Pin;
-						break;
 					//need to do some error handling here
 					default:
-						new_monitor.adc_cs = ADC3_CS_Pin;
+						new_monitor.adc_cs = ADC2_CS_Pin;
 						break;
 					}
                 monitor_list[curr_monitor] = new_monitor;
@@ -260,7 +255,7 @@ int parse_command(const char *json_string, int *driver_id, int *direction, drive
         const char *error_ptr = cJSON_GetErrorPtr();
         if (error_ptr != NULL) {
             sprintf(TxBuffer, "Error before: %s\n", error_ptr);
-            HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+            HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
         }
         status = 1;
         goto end;
@@ -302,7 +297,7 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 	fres = f_open(&fil, filename, FA_READ);
 	   if(fres != FR_OK) {
 		sprintf(TxBuffer,"f_open error (%i)\r\n", fres);
-		HAL_UART_Transmit(&huart2, (uint8_t*)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		HAL_UART_Transmit(&huart3, (uint8_t*)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		return -2;
 	   }
 
@@ -312,7 +307,7 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 
 	   if (size > buffer_size){
 		   sprintf(TxBuffer, "Error: Input buffer size too small \r\n");
-		   HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		   f_close(&fil);
 		   return -2;
 	   }
@@ -320,7 +315,7 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 	   TCHAR *rres = f_gets((TCHAR*)data_buffer,size, &fil);
 	   if(rres == 0) {
 		   sprintf(TxBuffer,"f_gets error (%i)\r\n", fres);
-		   HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
 		   f_close(&fil);
 		   return -2;
 	   }
@@ -336,7 +331,7 @@ int create_file(const char *filename)
     fres = f_open(&fil, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
     if (fres != FR_OK) {
         sprintf(TxBuffer, "f_open error (%i)\r\n", fres);
-        HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+        HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
         return -2;
     }
     f_close(&fil);
@@ -347,4 +342,11 @@ int create_file(const char *filename)
 int mount_sd(FATFS *Fatfs)
 {
     return (f_mount(Fatfs, "", 1));
+}
+
+float get_sensorval(sensor *current_sensor){
+	return current_sensor->calibration_slope;
+}
+void filter_and_decimate(float *sensor_vals, int sensor_count){
+	return;
 }

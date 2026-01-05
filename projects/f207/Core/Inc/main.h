@@ -66,7 +66,7 @@ typedef struct{
 #define MAX_MONITOR_COUNT 7
 #define MAX_IP_LEN 16
 #define FIR_LENGTH 16
-
+#define TEST_LOGIC
 
 extern sensor sensor_list[MAX_SENSOR_COUNT];
 extern driver driver_list[MAX_DRIVER_COUNT];
@@ -99,6 +99,18 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define USER_Btn_Pin GPIO_PIN_13
 #define USER_Btn_GPIO_Port GPIOC
+#define DRV0_Pin GPIO_PIN_0
+#define DRV0_GPIO_Port GPIOF
+#define DRV1_Pin GPIO_PIN_1
+#define DRV1_GPIO_Port GPIOF
+#define DRV2_Pin GPIO_PIN_2
+#define DRV2_GPIO_Port GPIOF
+#define DRV3_Pin GPIO_PIN_3
+#define DRV3_GPIO_Port GPIOF
+#define DRV4_Pin GPIO_PIN_4
+#define DRV4_GPIO_Port GPIOF
+#define IGN_Pin GPIO_PIN_5
+#define IGN_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1
@@ -115,6 +127,10 @@ void Error_Handler(void);
 #define RMII_RXD1_GPIO_Port GPIOC
 #define LD1_Pin GPIO_PIN_0
 #define LD1_GPIO_Port GPIOB
+#define ADC1_CS_Pin GPIO_PIN_13
+#define ADC1_CS_GPIO_Port GPIOF
+#define ADC2_CS_Pin GPIO_PIN_14
+#define ADC2_CS_GPIO_Port GPIOF
 #define RMII_TXD1_Pin GPIO_PIN_13
 #define RMII_TXD1_GPIO_Port GPIOB
 #define LD3_Pin GPIO_PIN_14

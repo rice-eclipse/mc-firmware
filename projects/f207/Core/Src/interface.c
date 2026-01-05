@@ -40,7 +40,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 		const char *error_ptr = cJSON_GetErrorPtr();
 		if (error_ptr != NULL) {
 			sprintf(TxBuffer, "Error before: %s\n", error_ptr);
-			HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+			HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		}
 		status = 1;
 		goto end;
@@ -57,7 +57,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 				*driver_id = drv_id->valueint;
 				*direction = dir->valueint;
 				sprintf(TxBuffer, "Actuating Driver %d. Direction: %d", driver_list[*driver_id].GPIO_Pin, *direction);
-				HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+				HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 				status = 0;
 			} else {
 				status = 1;
@@ -101,7 +101,7 @@ int read_file_interface(const char *filename, char *data_buffer, size_t buffer_s
 	int config_len = strlen(config_str2);
 	if (config_len > buffer_size){
 		sprintf(TxBuffer, "Error: Input buffer size too small \r\n");
-		HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		return -1;
 	} else{
 		strcpy(data_buffer, config_str2);
@@ -112,13 +112,13 @@ int read_file_interface(const char *filename, char *data_buffer, size_t buffer_s
 
 int create_file_interface(const char *filename){
 	sprintf(TxBuffer,"[TEST] file created successfully \r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	return 0;
 }
 
 int mount_sd_interface(FATFS* FatFs){
 	sprintf(TxBuffer, "Mounted sd \r\n");
-	HAL_UART_Transmit(&huart2, (uint8_t *)TxBuffer, strlen(TxBuffer), -1);
+	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	return 0;
 }
 float get_sensorval_interface(sensor *current_sensor){

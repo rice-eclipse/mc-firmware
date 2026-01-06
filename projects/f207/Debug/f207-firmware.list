@@ -27,25 +27,25 @@ Idx Name          Size      VMA       LMA       File off  Algn
                   ALLOC
  11 .ARM.attributes 00000029  00000000  00000000  000121f0  2**0
                   CONTENTS, READONLY
- 12 .debug_info   000293a7  00000000  00000000  00012219  2**0
+ 12 .debug_info   000293b8  00000000  00000000  00012219  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 13 .debug_abbrev 000062ff  00000000  00000000  0003b5c0  2**0
+ 13 .debug_abbrev 000062ff  00000000  00000000  0003b5d1  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 14 .debug_aranges 00002400  00000000  00000000  000418c0  2**3
+ 14 .debug_aranges 00002400  00000000  00000000  000418d0  2**3
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 15 .debug_rnglists 00001bf0  00000000  00000000  00043cc0  2**0
+ 15 .debug_rnglists 00001bf0  00000000  00000000  00043cd0  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 16 .debug_macro  00028b1e  00000000  00000000  000458b0  2**0
+ 16 .debug_macro  00028b1e  00000000  00000000  000458c0  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 17 .debug_line   0002bb86  00000000  00000000  0006e3ce  2**0
+ 17 .debug_line   0002bb8a  00000000  00000000  0006e3de  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 18 .debug_str    000e16bf  00000000  00000000  00099f54  2**0
+ 18 .debug_str    000e16cb  00000000  00000000  00099f68  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 19 .comment      00000043  00000000  00000000  0017b613  2**0
+ 19 .comment      00000043  00000000  00000000  0017b633  2**0
                   CONTENTS, READONLY
- 20 .debug_frame  0000ac50  00000000  00000000  0017b658  2**2
+ 20 .debug_frame  0000ac50  00000000  00000000  0017b678  2**2
                   CONTENTS, READONLY, DEBUGGING, OCTETS
- 21 .debug_line_str 00000070  00000000  00000000  001862a8  2**0
+ 21 .debug_line_str 00000070  00000000  00000000  001862c8  2**0
                   CONTENTS, READONLY, DEBUGGING, OCTETS
 
 Disassembly of section .text:
@@ -5097,8 +5097,8 @@ void StartProcessingTask(void *argument)
  8002712:	b089      	sub	sp, #36	@ 0x24
  8002714:	af02      	add	r7, sp, #8
  8002716:	6078      	str	r0, [r7, #4]
-	uint32_t processing_flag;
-	float *current_buffer;
+	FRESULT fres;
+#endif
   /* Infinite loop */
   for(;;)
   {
@@ -5188,7 +5188,11 @@ void StartProcessingTask(void *argument)
  80027ae:	693a      	ldr	r2, [r7, #16]
  80027b0:	429a      	cmp	r2, r3
  80027b2:	dbd4      	blt.n	800275e <StartProcessingTask+0x4e>
+	  /*sync data to SD card every second*/
+	  if (sync_count == 0){
+		  fsync(&data_file);
 	  }
+#endif
 	  osDelay(100);
  80027b4:	2064      	movs	r0, #100	@ 0x64
  80027b6:	f006 f8bc 	bl	8008932 <osDelay>

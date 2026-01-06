@@ -63,6 +63,8 @@ float sensor_vals[2*MAX_SENSOR_COUNT];
 char tx_buffer[300];
 FIL data_file;
 FIL log_file;
+
+
 /* USER CODE END Variables */
 
 
@@ -181,6 +183,14 @@ void StartProcessingTask(void *argument)
   /* USER CODE BEGIN StartProcessingTask */
 	uint32_t processing_flag;
 	float *current_buffer;
+	/*We sync the file to the sd card every second*/
+#ifndef TEST_LOGIC
+	int sync_count = 0;
+	FRESULT fres;
+	//stores the sensor values in a single string to write to the sd card
+	char sdcard_data[200];
+	char logging_str[100];
+#endif
   /* Infinite loop */
   for(;;)
   {
@@ -200,7 +210,26 @@ void StartProcessingTask(void *argument)
 		  sprintf(tx_buffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
 				  	  	  	  	  	  	  	  	  	   current_buffer[i]);
 		  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+		  /*TODO: find a less tacky solution */
+#ifndef TEST_LOGIC
+		  char single_sensor_data[10];
+		  sprintf(single_sensor_data,"%2f,"current_buffer[i]);
+		  strcat(sdcard_data,single_sensor_data);
+#endif
 	  }
+#ifndef TEST_LOGIC
+	  char *end_str = "\r\n";
+	  strcat(sdcard_data,end_str);
+	  /*TODO: include timestamps from RTC*/
+	  sprintf(logging_str, "performed data sampling\r\n");
+	  fres = write_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
+	  fres = write_file_interface(&log_file, logging_str, strlen(logging_str));
+	  sync_count = (sync_count + 1) % sampling_freq_ign;
+	  /*sync data to SD card every second*/
+	  if (sync_count == 0){
+		  fsync(&data_file);
+	  }
+#endif
 	  osDelay(100);
   }
   /* USER CODE END StartProcessingTask */

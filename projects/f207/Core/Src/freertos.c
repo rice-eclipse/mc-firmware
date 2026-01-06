@@ -33,6 +33,9 @@
 #include "interface.h"
 #include "tim.h"
 #include "gpio.h"
+#include "cmsis_os.h"
+#include "fatfs.h"
+#include "sdio.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -58,7 +61,11 @@
 /* USER CODE BEGIN Variables */
 float sensor_vals[2*MAX_SENSOR_COUNT];
 char tx_buffer[300];
+FIL data_file;
+FIL log_file;
 /* USER CODE END Variables */
+
+
 /* Definitions for collectionTask */
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
@@ -91,7 +98,8 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+	create_file_interface(&data_file,"data.csv");
+	create_file_interface(&log_file,"console.log");
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */

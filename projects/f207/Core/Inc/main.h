@@ -82,6 +82,7 @@ extern int sensor_count;
 extern int driver_count;
 extern int monitor_count;
 
+
 /* USER CODE END EC */
 
 /* Exported macro ------------------------------------------------------------*/

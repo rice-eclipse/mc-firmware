@@ -76,7 +76,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	}
 
 
-int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
+int read_file_interface(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size){
 
 	const char *config_str2 =
 			"{"
@@ -125,10 +125,14 @@ int read_file_interface(const char *filename, char *data_buffer, size_t buffer_s
 }
 
 
-int create_file_interface(const char *filename){
+int create_file_interface(FIL *target_file, const char *filename){
 	sprintf(TxBuffer,"[TEST] file created successfully \r\n");
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	return 0;
+}
+int write_file_interface(FIL *target_file, char *data, UINT btw){
+	sprintf(TxBuffer, "wrote %s\r\n", data);
+	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 }
 
 int mount_sd_interface(FATFS* FatFs){
@@ -170,12 +174,16 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	return parse_command(json_string, driver_id, direction, driver_list);
 }
 
-int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
-	return read_file(filename, data_buffer, buffer_size);
+int read_file_interface(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size){
+	return read_file(target_file, filename, data_buffer, buffer_size);
 }
 
-int create_file_interface(const char *filename){
-	return create_file(filename);
+int create_file_interface(FIL *target_file, const char *filename){
+	return create_file(target_file, filename);
+}
+
+int write_file_interface(FIL *target_file, char *data, UINT btw){
+	return write_file(FIL *target_file, char *data, UINT btw);
 }
 int mount_sd_interface(FATFS* FatFs){
 	return mount_sd(FatFs);

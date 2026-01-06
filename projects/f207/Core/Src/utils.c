@@ -290,11 +290,11 @@ end:
 
 /* ========== SD + FILE HELPERS WITH TEST PLACEHOLDERS ========== */
 
-int read_file(const char *filename, char *data_buffer, size_t buffer_size)
+int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size)
 {
-    FIL fil;
+
 	FRESULT fres;
-	fres = f_open(&fil, filename, FA_READ);
+	fres = f_open(target_file, filename, FA_READ);
 	   if(fres != FR_OK) {
 		sprintf(TxBuffer,"f_open error (%i)\r\n", fres);
 		HAL_UART_Transmit(&huart3, (uint8_t*)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -302,41 +302,58 @@ int read_file(const char *filename, char *data_buffer, size_t buffer_size)
 	   }
 
 	   //get the number of characters to allocate to this string
-	   f_lseek(&fil,SEEK_END);
-	   long size = f_size(&fil);
+	   f_lseek(target_file,SEEK_END);
+	   long size = f_size(target_file);
 
 	   if (size > buffer_size){
 		   sprintf(TxBuffer, "Error: Input buffer size too small \r\n");
 		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-		   f_close(&fil);
+		   f_close(target_file);
 		   return -2;
 	   }
 
-	   TCHAR *rres = f_gets((TCHAR*)data_buffer,size, &fil);
+	   TCHAR *rres = f_gets((TCHAR*)data_buffer,size, target_file);
 	   if(rres == 0) {
 		   sprintf(TxBuffer,"f_gets error (%i)\r\n", fres);
 		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
-		   f_close(&fil);
+		   f_close(target_file);
 		   return -2;
 	   }
-	   f_close(&fil);
+	   f_close(target_file);
 	   return 0;
 }
 
-int create_file(const char *filename)
+int create_file(FIL *target_file,const char *filename)
 {
 
-    FIL fil;
+
     FRESULT fres;
-    fres = f_open(&fil, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
+    fres = f_open(target_file, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
     if (fres != FR_OK) {
         sprintf(TxBuffer, "f_open error (%i)\r\n", fres);
         HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
         return -2;
     }
-    f_close(&fil);
+    f_close(target_file);
     return 0;
 
+}
+int write_file(FIL *target_file, char *data, UINT btw){
+	FRESULT fres;
+	UINT bytes_written;
+	fres = f_write(target_file, data, btw, &bytes_written);
+	if (fres != FR_OK){
+		if (bytes_written != btw){
+			sprintf(TxBuffer, "incomplete file write \r\n");
+			HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+			return -1;
+		}
+		else {
+			sprintf(TxBuffer, "write file error: %d\r\n", fres);
+			HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),HAL_MAX_DELAY);
+			return -2;
+		}
+	}
 }
 
 int mount_sd(FATFS *Fatfs)

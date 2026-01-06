@@ -1,7 +1,8 @@
 ../Core/Src/utils.c:14:5:parse_config	200	static
 ../Core/Src/utils.c:245:5:parse_command	48	static
-../Core/Src/utils.c:293:5:read_file	4176	static
-../Core/Src/utils.c:326:5:create_file	4160	static
-../Core/Src/utils.c:342:5:mount_sd	16	static
-../Core/Src/utils.c:347:7:get_sensorval	16	static
-../Core/Src/utils.c:350:6:filter_and_decimate	16	static
+../Core/Src/utils.c:293:5:read_file	40	static
+../Core/Src/utils.c:326:5:create_file	24	static
+../Core/Src/utils.c:341:5:write_file	32	static
+../Core/Src/utils.c:359:5:mount_sd	16	static
+../Core/Src/utils.c:364:7:get_sensorval	16	static
+../Core/Src/utils.c:367:6:filter_and_decimate	16	static

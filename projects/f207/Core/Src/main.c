@@ -58,7 +58,7 @@ static char TxBuffer[300];
 static char config_str[4000];
 FATFS FatFs; 	//Fatfs handle
 char rx_buffer[52];
-
+FIL config_file;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -84,6 +84,7 @@ int monitor_count = MAX_MONITOR_COUNT;
 driver driver_list[MAX_DRIVER_COUNT];
 monitor monitor_list[MAX_MONITOR_COUNT];
 sensor sensor_list[MAX_SENSOR_COUNT];
+
 /* USER CODE END 0 */
 
 /**
@@ -134,11 +135,10 @@ int main(void)
 
    /*parse the configuration file to get the available
    	sensors and drivers*/
-     read_file_interface("config.json", config_str,4000);
+     read_file_interface(&config_file, "config.json", config_str,4000);
      parse_config_interface(config_str, driver_list, sensor_list, monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby,
    		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
-     create_file_interface("data.csv");
-     create_file_interface("console.log");
+
   /* USER CODE END 2 */
 
   /* Init scheduler */

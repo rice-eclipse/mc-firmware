@@ -1,8 +1,9 @@
-../Core/Src/interface.c:164:5:parse_config_interface	56	static
-../Core/Src/interface.c:173:5:parse_command_interface	24	static
-../Core/Src/interface.c:177:5:read_file_interface	24	static
-../Core/Src/interface.c:181:5:create_file_interface	16	static
-../Core/Src/interface.c:185:5:write_file_interface	24	static
-../Core/Src/interface.c:188:5:mount_sd_interface	16	static
-../Core/Src/interface.c:191:7:get_sensorval_interface	16	static
-../Core/Src/interface.c:195:6:filter_and_decimate_interface	16	static
+../Core/Src/interface.c:168:5:parse_config_interface	56	static
+../Core/Src/interface.c:177:5:parse_command_interface	24	static
+../Core/Src/interface.c:181:5:read_file_interface	24	static
+../Core/Src/interface.c:185:5:create_file_interface	16	static
+../Core/Src/interface.c:189:5:write_file_interface	24	static
+../Core/Src/interface.c:192:5:mount_sd_interface	16	static
+../Core/Src/interface.c:195:5:close_file_interface	16	static
+../Core/Src/interface.c:198:7:get_sensorval_interface	16	static
+../Core/Src/interface.c:202:6:filter_and_decimate_interface	16	static

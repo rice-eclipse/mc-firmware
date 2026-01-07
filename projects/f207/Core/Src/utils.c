@@ -361,6 +361,9 @@ int mount_sd(FATFS *Fatfs)
     return (f_mount(Fatfs, "", 1));
 }
 
+int close_file(FIL *target_file){
+	return f_close(target_file);
+}
 float get_sensorval(sensor *current_sensor){
 	return current_sensor->calibration_slope;
 }

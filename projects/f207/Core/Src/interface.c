@@ -135,6 +135,10 @@ int write_file_interface(FIL *target_file, char *data, UINT btw){
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 }
 
+int close_file_interface(FIL *target_file){
+	sprintf(TxBuffer, "closed file\r\n");
+}
+
 int mount_sd_interface(FATFS* FatFs){
 	sprintf(TxBuffer, "Mounted sd \r\n");
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -187,6 +191,9 @@ int write_file_interface(FIL *target_file, char *data, UINT btw){
 }
 int mount_sd_interface(FATFS* FatFs){
 	return mount_sd(FatFs);
+}
+int close_file_interface(FIL *target_file){
+	return close_file(target_file);
 }
 float get_sensorval_interface(sensor *current_sensor){
 	return get_sensorval(current_sensor);

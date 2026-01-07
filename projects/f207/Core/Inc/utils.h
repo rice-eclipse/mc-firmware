@@ -22,6 +22,7 @@ int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t 
 int create_file(FIL *target_file,const char *filename);
 int write_file(FIL *target_file, char *data, UINT btw);
 int mount_sd(FATFS* FatFs);
+int close_file(FIL *target_file);
 float get_sensorval(sensor *current_sensor);
 void filter_and_decimate(float *sensor_vals, int sensor_count);
 

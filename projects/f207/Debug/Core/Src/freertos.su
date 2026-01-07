@@ -1,4 +1,5 @@
-../Core/Src/freertos.c:99:6:MX_FREERTOS_Init	8	static
-../Core/Src/freertos.c:147:6:StartCollectionTask	24	static
-../Core/Src/freertos.c:179:6:StartProcessingTask	368	static
-../Core/Src/freertos.c:238:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/freertos.c:108:6:MX_FREERTOS_Init	8	static
+../Core/Src/freertos.c:160:6:StartCollectionTask	24	static
+../Core/Src/freertos.c:192:6:StartProcessingTask	368	static
+../Core/Src/freertos.c:260:6:startShutdownTask	24	static
+../Core/Src/freertos.c:290:6:HAL_TIM_PeriodElapsedCallback	16	static

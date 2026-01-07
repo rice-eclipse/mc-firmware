@@ -49,7 +49,8 @@
 #define FIRST_BUF_READY (1 << 0)
 #define SECOND_BUF_READY (1 << 1)
 #define SAMPLE_NOW (1 << 2)
-
+#define SHUTDOWN (1 << 3)
+#define LOGGING_STOPPED (1 << 4)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -63,7 +64,7 @@ float sensor_vals[2*MAX_SENSOR_COUNT];
 char tx_buffer[300];
 FIL data_file;
 FIL log_file;
-
+volatile int stop_logging;
 
 /* USER CODE END Variables */
 /* Definitions for collectionTask */
@@ -80,6 +81,13 @@ const osThreadAttr_t processingTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
+/* Definitions for shutdownTask */
+osThreadId_t shutdownTaskHandle;
+const osThreadAttr_t shutdownTask_attributes = {
+  .name = "shutdownTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -88,6 +96,7 @@ const osThreadAttr_t processingTask_attributes = {
 
 void StartCollectionTask(void *argument);
 void StartProcessingTask(void *argument);
+void startShutdownTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -98,6 +107,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
+	stop_logging = 0;
 	create_file_interface(&data_file,"data.csv");
 	create_file_interface(&log_file,"console.log");
   /* USER CODE END Init */
@@ -124,6 +134,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of processingTask */
   processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
+
+  /* creation of shutdownTask */
+  shutdownTaskHandle = osThreadNew(startShutdownTask, NULL, &shutdownTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -164,7 +177,7 @@ void StartCollectionTask(void *argument)
 	 else if (sample_count == 0){
 		 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 	 }
-	 osDelay(100);
+	 osDelay(1);
   }
   /* USER CODE END StartCollectionTask */
 }
@@ -201,36 +214,75 @@ void StartProcessingTask(void *argument)
 	  else if (processing_flag & SECOND_BUF_READY){
 		  current_buffer = &sensor_vals[sensor_count];
 	  }
-	  //performs the filtering and decimation of the data
-	  filter_and_decimate_interface(current_buffer, sensor_count);
-	  //writes the data to SD card
-	  for (int i = 0; i < sensor_count; i++){
-		  sprintf(tx_buffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
-				  	  	  	  	  	  	  	  	  	   current_buffer[i]);
-		  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
-		  /*TODO: find a less tacky solution */
-#ifndef TEST_LOGIC
-		  char single_sensor_data[10];
-		  sprintf(single_sensor_data,"%2f,",current_buffer[i]);
-		  strcat(sdcard_data,single_sensor_data);
-#endif
+
+	  if (stop_logging == 0){
+		  //performs the filtering and decimation of the data
+		  filter_and_decimate_interface(current_buffer, sensor_count);
+		  //writes the data to SD card
+		  for (int i = 0; i < sensor_count; i++){
+			  sprintf(tx_buffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
+					  	  	  	  	  	  	  	  	  	   current_buffer[i]);
+			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+			  /*TODO: find a less tacky solution */
+	#ifndef TEST_LOGIC
+			  char single_sensor_data[10];
+			  sprintf(single_sensor_data,"%2f,",current_buffer[i]);
+			  strcat(sdcard_data,single_sensor_data);
+	#endif
+		  }
+	#ifndef TEST_LOGIC
+		  char *end_str = "\r\n";
+		  strcat(sdcard_data,end_str);
+		  /*TODO: include timestamps from RTC*/
+		  sprintf(logging_str, "performed data sampling\r\n");
+		  fres = write_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
+		  fres = write_file_interface(&log_file, logging_str, strlen(logging_str));
+		  sync_count = (sync_count + 1) % sampling_freq_ign;
+		  /*sync data to SD card every second*/
+		  if (sync_count == 0){
+			  f_sync(&data_file);
+		  }
+	#endif
+		  osDelay(1);
 	  }
-#ifndef TEST_LOGIC
-	  char *end_str = "\r\n";
-	  strcat(sdcard_data,end_str);
-	  /*TODO: include timestamps from RTC*/
-	  sprintf(logging_str, "performed data sampling\r\n");
-	  fres = write_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
-	  fres = write_file_interface(&log_file, logging_str, strlen(logging_str));
-	  sync_count = (sync_count + 1) % sampling_freq_ign;
-	  /*sync data to SD card every second*/
-	  if (sync_count == 0){
-		  f_sync(&data_file);
-	  }
-#endif
-	  osDelay(100);
+
   }
   /* USER CODE END StartProcessingTask */
+}
+
+/* USER CODE BEGIN Header_startShutdownTask */
+/**
+* @brief stops logging &processing, and closes all the files when a shutdown condition is met
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startShutdownTask */
+void startShutdownTask(void *argument)
+{
+  /* USER CODE BEGIN startShutdownTask */
+	uint32_t shutdown_flag;
+  /* Infinite loop */
+  for(;;)
+  {
+	shutdown_flag = osThreadFlagsWait(SHUTDOWN, osFlagsWaitAny, osWaitForever);
+	/*Tell processing task to stop*/
+	stop_logging = 1;
+
+	/*Waits for processing to stop*/
+	shutdown_flag = osThreadFlagsWait(LOGGING_STOPPED, osFlagsWaitAny, osWaitForever);
+
+	close_file_interface(&data_file);
+	close_file_interface(&log_file);
+	unmount_sd_interface();
+	if (collectionTaskHandle != NULL){
+		osThreadTerminate(collectionTaskHandle);
+	}
+	if (processingTaskHandle != NULL){
+		osThreadTerminate(processingTaskHandle);
+	}
+    osDelay(1);
+  }
+  /* USER CODE END startShutdownTask */
 }
 
 /* Private application code --------------------------------------------------*/
@@ -249,6 +301,11 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  /*sampling event has occured*/
 	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
 	  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
+  }
+  if (htim->Instance == TIM11){
+	  /*shutdown condition has occured*/
+	  osThreadFlagsSet(shutdownTaskHandle,SHUTDOWN);
+	  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
   }
 
   /* USER CODE END Callback 1 */

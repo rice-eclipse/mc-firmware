@@ -641,7 +641,7 @@ osStatus osMutexDelete (osMutexId mutex_id);
 /// Define a Semaphore object.
 /// \param         name          name of the semaphore object.
 #if defined (osObjectsExternal)  // object is external
-#define osSemaphoreDef(name) \
+#define osSemaphoreDef(name)
 extern const osSemaphoreDef_t os_semaphore_def_##name
 #else                            // define the object
 #define osSemaphoreDef(name) \

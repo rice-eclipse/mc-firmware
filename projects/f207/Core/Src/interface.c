@@ -183,7 +183,7 @@ int create_file_interface(FIL *target_file, const char *filename){
 }
 
 int write_file_interface(FIL *target_file, char *data, UINT btw){
-	return write_file(FIL *target_file, char *data, UINT btw);
+	return write_file(target_file, data,btw);
 }
 int mount_sd_interface(FATFS* FatFs){
 	return mount_sd(FatFs);

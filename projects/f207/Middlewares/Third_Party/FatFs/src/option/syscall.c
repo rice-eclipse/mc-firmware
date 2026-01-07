@@ -6,6 +6,7 @@
 #include <stdlib.h>		/* ANSI memory controls */
 #include "../ff.h"
 
+
 #if _FS_REENTRANT
 /*-----------------------------------------------------------------------
  Create a Synchronization Object
@@ -22,9 +23,8 @@ int ff_cre_syncobj (	/* TRUE:Function succeeded, FALSE:Could not create due to a
 {
   int ret;
   
-  osSemaphoreDef(SEM);
-  *sobj = osSemaphoreCreate(osSemaphore(SEM), 1);		
-  ret = (*sobj != NULL);
+  sobj = osMutexNew(NULL);
+  ret = (sobj != NULL);
   
   return ret;
 }
@@ -43,7 +43,7 @@ int ff_del_syncobj (	/* TRUE:Function succeeded, FALSE:Could not delete due to a
 	_SYNC_t sobj		/* Sync object tied to the logical drive to be deleted */
 )
 {
-  osSemaphoreDelete (sobj);
+  osMutexDelete (sobj);
   return 1;
 }
 
@@ -62,7 +62,7 @@ int ff_req_grant (	/* TRUE:Got a grant to access the volume, FALSE:Could not get
 {
   int ret = 0;
   
-  if(osSemaphoreWait(sobj, _FS_TIMEOUT) == osOK)
+  if(osMutexAcquire(sobj, _FS_TIMEOUT) == osOK)
   {
     ret = 1;
   }
@@ -82,7 +82,7 @@ void ff_rel_grant (
 	_SYNC_t sobj	/* Sync object to be signaled */
 )
 {
-  osSemaphoreRelease(sobj);
+  osMutexRelease(sobj);
 }
 
 #endif

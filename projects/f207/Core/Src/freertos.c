@@ -66,8 +66,6 @@ FIL log_file;
 
 
 /* USER CODE END Variables */
-
-
 /* Definitions for collectionTask */
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
@@ -213,7 +211,7 @@ void StartProcessingTask(void *argument)
 		  /*TODO: find a less tacky solution */
 #ifndef TEST_LOGIC
 		  char single_sensor_data[10];
-		  sprintf(single_sensor_data,"%2f,"current_buffer[i]);
+		  sprintf(single_sensor_data,"%2f,",current_buffer[i]);
 		  strcat(sdcard_data,single_sensor_data);
 #endif
 	  }
@@ -227,7 +225,7 @@ void StartProcessingTask(void *argument)
 	  sync_count = (sync_count + 1) % sampling_freq_ign;
 	  /*sync data to SD card every second*/
 	  if (sync_count == 0){
-		  fsync(&data_file);
+		  f_sync(&data_file);
 	  }
 #endif
 	  osDelay(100);

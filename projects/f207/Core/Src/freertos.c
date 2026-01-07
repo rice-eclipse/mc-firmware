@@ -62,8 +62,13 @@
 /* USER CODE BEGIN Variables */
 float sensor_vals[2*MAX_SENSOR_COUNT];
 char tx_buffer[300];
+//stores the sensor values in a single string to write to the sd card
+char sdcard_data[200];
+char logging_str[100];
 FIL data_file;
 FIL log_file;
+long tim14_tick_count;
+int tim13_tick_count;
 volatile int stop_logging;
 
 /* USER CODE END Variables */
@@ -79,7 +84,7 @@ osThreadId_t processingTaskHandle;
 const osThreadAttr_t processingTask_attributes = {
   .name = "processingTask",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .priority = (osPriority_t) osPriorityHigh7,
 };
 /* Definitions for shutdownTask */
 osThreadId_t shutdownTaskHandle;
@@ -108,6 +113,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 	stop_logging = 0;
+	tim13_tick_count = 0;
 	create_file_interface(&data_file,"data.csv");
 	create_file_interface(&log_file,"console.log");
   /* USER CODE END Init */
@@ -161,6 +167,7 @@ void StartCollectionTask(void *argument)
 {
   /* USER CODE BEGIN StartCollectionTask */
 	 HAL_TIM_Base_Start_IT(&htim14);
+	 HAL_TIM_Base_Start_IT(&htim13);
 	int sample_count = 0;
 	uint32_t sampling_flag;
   /* Infinite loop */
@@ -195,12 +202,9 @@ void StartProcessingTask(void *argument)
 	uint32_t processing_flag;
 	float *current_buffer;
 	/*We sync the file to the sd card every second*/
-#ifndef TEST_LOGIC
 	int sync_count = 0;
+#ifndef TEST_LOGIC
 	FRESULT fres;
-	//stores the sensor values in a single string to write to the sd card
-	char sdcard_data[200];
-	char logging_str[100];
 #endif
   /* Infinite loop */
   for(;;)
@@ -218,34 +222,50 @@ void StartProcessingTask(void *argument)
 	  if (stop_logging == 0){
 		  //performs the filtering and decimation of the data
 		  filter_and_decimate_interface(current_buffer, sensor_count);
+		  sdcard_data[0] = '\0';
 		  //writes the data to SD card
 		  for (int i = 0; i < sensor_count; i++){
+
 			  sprintf(tx_buffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
-					  	  	  	  	  	  	  	  	  	   current_buffer[i]);
-			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
-			  /*TODO: find a less tacky solution */
-	#ifndef TEST_LOGIC
+																	   current_buffer[i]);
+			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+
+
+
 			  char single_sensor_data[10];
 			  sprintf(single_sensor_data,"%2f,",current_buffer[i]);
 			  strcat(sdcard_data,single_sensor_data);
-	#endif
 		  }
-	#ifndef TEST_LOGIC
+
 		  char *end_str = "\r\n";
 		  strcat(sdcard_data,end_str);
 		  /*TODO: include timestamps from RTC*/
+
 		  sprintf(logging_str, "performed data sampling\r\n");
+		  sprintf(tx_buffer, "logged: %s\r\n", sdcard_data);
+		 HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+
+
+
+		  sync_count = (sync_count + 1) % sampling_freq_ign;
+		  if (sync_count == 0){
+			  sprintf(tx_buffer, "synced data\r\n");
+			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+		  }
+#ifndef TEST_LOGIC
 		  fres = write_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
 		  fres = write_file_interface(&log_file, logging_str, strlen(logging_str));
-		  sync_count = (sync_count + 1) % sampling_freq_ign;
+
 		  /*sync data to SD card every second*/
 		  if (sync_count == 0){
 			  f_sync(&data_file);
 		  }
 	#endif
-		  osDelay(1);
 	  }
-
+	  else{
+		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
+	  }
+	  osDelay(1);
   }
   /* USER CODE END StartProcessingTask */
 }
@@ -280,6 +300,9 @@ void startShutdownTask(void *argument)
 	if (processingTaskHandle != NULL){
 		osThreadTerminate(processingTaskHandle);
 	}
+	sprintf(tx_buffer, "All tasks closed\r\n");
+	HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+	osThreadExit();
     osDelay(1);
   }
   /* USER CODE END startShutdownTask */
@@ -302,9 +325,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
 	  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
   }
-  if (htim->Instance == TIM11){
+  if (htim->Instance == TIM13){
 	  /*shutdown condition has occured*/
-	  osThreadFlagsSet(shutdownTaskHandle,SHUTDOWN);
+	  if (tim13_tick_count == 1){
+		  osThreadFlagsSet(shutdownTaskHandle,SHUTDOWN);
+	  }
+	  else{
+		  tim13_tick_count = 1;
+	  }
 	  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
   }
 

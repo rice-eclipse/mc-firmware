@@ -124,7 +124,7 @@ int main(void)
   MX_FATFS_Init();
   MX_SPI1_Init();
   MX_SPI2_Init();
-  MX_TIM11_Init();
+  MX_TIM13_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
    FRESULT fres = mount_sd_interface(&FatFs);

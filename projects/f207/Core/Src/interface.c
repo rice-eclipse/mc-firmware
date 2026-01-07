@@ -82,7 +82,7 @@ int read_file_interface(FIL *target_file, const char *filename, char *data_buffe
 			"{"
 			"\"host\": {\"ip\": \"127.0.0.1\"},"
 			"\"port\": 1234,"
-			"\"sampling_freq_ignition\": 10,"
+			"\"sampling_freq_ignition\": 5000,"
 			"\"sampling_freq_standby\": 1,"
 			"\"sensors\": ["
 			"  {"
@@ -133,10 +133,13 @@ int create_file_interface(FIL *target_file, const char *filename){
 int write_file_interface(FIL *target_file, char *data, UINT btw){
 	sprintf(TxBuffer, "wrote %s\r\n", data);
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+	return 0;
 }
 
 int close_file_interface(FIL *target_file){
 	sprintf(TxBuffer, "closed file\r\n");
+	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+	return 0;
 }
 
 int mount_sd_interface(FATFS* FatFs){

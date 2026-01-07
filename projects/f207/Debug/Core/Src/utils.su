@@ -3,7 +3,7 @@
 ../Core/Src/utils.c:293:5:read_file	40	static
 ../Core/Src/utils.c:326:5:create_file	24	static
 ../Core/Src/utils.c:341:5:write_file	32	static
-../Core/Src/utils.c:359:5:mount_sd	16	static
-../Core/Src/utils.c:364:5:close_file	16	static
-../Core/Src/utils.c:367:7:get_sensorval	16	static
-../Core/Src/utils.c:370:6:filter_and_decimate	16	static
+../Core/Src/utils.c:360:5:mount_sd	16	static
+../Core/Src/utils.c:365:5:close_file	16	static
+../Core/Src/utils.c:368:7:get_sensorval	16	static
+../Core/Src/utils.c:371:6:filter_and_decimate	16	static

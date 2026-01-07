@@ -354,6 +354,7 @@ int write_file(FIL *target_file, char *data, UINT btw){
 			return -2;
 		}
 	}
+	return 0;
 }
 
 int mount_sd(FATFS *Fatfs)

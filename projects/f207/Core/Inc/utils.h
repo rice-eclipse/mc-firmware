@@ -24,6 +24,7 @@ int write_file(FIL *target_file, char *data, UINT btw);
 int mount_sd(FATFS* FatFs);
 int close_file(FIL *target_file);
 float get_sensorval(sensor *current_sensor);
+uint16_t get_mcp3208_adcval(int channel, in cs, SPI_HandleTypeDef *spiHandle);
 void filter_and_decimate(float *sensor_vals, int sensor_count);
 
 #endif /* INC_UTILS_H_ */

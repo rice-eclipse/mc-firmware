@@ -66,7 +66,7 @@ typedef struct{
 #define MAX_MONITOR_COUNT 7
 #define MAX_IP_LEN 16
 #define FIR_LENGTH 16
-#define TEST_LOGIC
+
 
 extern sensor sensor_list[MAX_SENSOR_COUNT];
 extern driver driver_list[MAX_DRIVER_COUNT];

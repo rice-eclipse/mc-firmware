@@ -130,7 +130,7 @@ int create_file_interface(FIL *target_file, const char *filename){
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	return 0;
 }
-int write_file_interface(FIL *target_file, char *data, UINT btw){
+int append_file_interface(FIL *target_file, char *data, UINT btw){
 	sprintf(TxBuffer, "wrote %s\r\n", data);
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	return 0;
@@ -189,8 +189,8 @@ int create_file_interface(FIL *target_file, const char *filename){
 	return create_file(target_file, filename);
 }
 
-int write_file_interface(FIL *target_file, char *data, UINT btw){
-	return write_file(target_file, data,btw);
+int append_file_interface(FIL *target_file, char *data, UINT btw){
+	return append_file(target_file, data,btw);
 }
 int mount_sd_interface(FATFS* FatFs){
 	return mount_sd(FatFs);

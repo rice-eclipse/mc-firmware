@@ -21,7 +21,7 @@ int parse_config_interface(const char *config_str, driver *driver_list,sensor *s
 int parse_command_interface(const char* json_string, int* driver_id, int* direction, driver *driver_list);
 int read_file_interface(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size);
 int create_file_interface(FIL *target_file, const char *filename);
-int write_file_interface(FIL *target_file, char *data, UINT btw);
+int append_file_interface(FIL *target_file, char *data, UINT btw);
 int close_file_interface(FIL *target_file);
 int mount_sd_interface(FATFS* FatFs);
 float get_sensorval_interface(sensor *current_sensor);

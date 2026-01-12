@@ -23,7 +23,7 @@ int ff_cre_syncobj (	/* TRUE:Function succeeded, FALSE:Could not create due to a
 {
   int ret;
   
-  sobj = osMutexNew(NULL);
+  *sobj = osMutexNew(NULL);
   ret = (sobj != NULL);
   
   return ret;

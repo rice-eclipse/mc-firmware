@@ -129,6 +129,7 @@ int main(void)
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
+  HAL_Delay(1);
    FRESULT fres = mount_sd_interface(&FatFs);
    if (fres != FR_OK){
  	  sprintf(TxBuffer,"f_mount error (%i)\r\n", fres);
@@ -217,14 +218,7 @@ void SystemClock_Config(void)
 
 /* USER CODE END 4 */
 
-/**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM7 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
+
 
 /**
   * @brief  This function is executed in case of error occurrence.

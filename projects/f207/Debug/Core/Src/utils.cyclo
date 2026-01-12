@@ -1,9 +1,10 @@
 ../Core/Src/utils.c:14:5:parse_config	37
 ../Core/Src/utils.c:245:5:parse_command	7
-../Core/Src/utils.c:293:5:read_file	4
-../Core/Src/utils.c:326:5:create_file	2
-../Core/Src/utils.c:341:5:write_file	3
-../Core/Src/utils.c:360:5:mount_sd	1
-../Core/Src/utils.c:365:5:close_file	1
-../Core/Src/utils.c:368:7:get_sensorval	1
-../Core/Src/utils.c:371:6:filter_and_decimate	1
+../Core/Src/utils.c:293:5:read_file	5
+../Core/Src/utils.c:328:5:create_file	2
+../Core/Src/utils.c:343:5:append_file	2
+../Core/Src/utils.c:357:5:mount_sd	1
+../Core/Src/utils.c:362:5:close_file	1
+../Core/Src/utils.c:365:7:get_sensorval	1
+../Core/Src/utils.c:368:10:get_mcp3208_adcval	1
+../Core/Src/utils.c:388:6:filter_and_decimate	1

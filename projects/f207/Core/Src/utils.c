@@ -302,22 +302,24 @@ int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t 
 	   }
 
 	   //get the number of characters to allocate to this string
-	   f_lseek(target_file,SEEK_END);
 	   long size = f_size(target_file);
-
 	   if (size > buffer_size){
 		   sprintf(TxBuffer, "Error: Input buffer size too small \r\n");
 		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		   f_close(target_file);
 		   return -2;
 	   }
-
-	   TCHAR *rres = f_gets((TCHAR*)data_buffer,size, target_file);
-	   if(rres == 0) {
+	   UINT br = 0;
+	   FRESULT rres = f_read(target_file,(void *)data_buffer,size, &br);
+	   if(rres != FR_OK) {
 		   sprintf(TxBuffer,"f_gets error (%i)\r\n", fres);
-		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),-1);
+		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),HAL_MAX_DELAY);
 		   f_close(target_file);
 		   return -2;
+	   }
+	   if (br != size){
+		   sprintf(TxBuffer,"File not read fully!\r\n");
+		   HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	   }
 	   f_close(target_file);
 	   return 0;
@@ -328,7 +330,7 @@ int create_file(FIL *target_file,const char *filename)
 
 
     FRESULT fres;
-    fres = f_open(target_file, filename, FA_WRITE | FA_OPEN_ALWAYS | FA_CREATE_ALWAYS);
+    fres = f_open(target_file, filename, FA_WRITE |FA_CREATE_NEW);
     if (fres != FR_OK) {
         sprintf(TxBuffer, "f_open error (%i)\r\n", fres);
         HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -338,21 +340,16 @@ int create_file(FIL *target_file,const char *filename)
     return 0;
 
 }
-int write_file(FIL *target_file, char *data, UINT btw){
+int append_file(FIL *target_file, char *data, UINT btw){
 	FRESULT fres;
 	UINT bytes_written;
 	fres = f_write(target_file, data, btw, &bytes_written);
 	if (fres != FR_OK){
-		if (bytes_written != btw){
-			sprintf(TxBuffer, "incomplete file write \r\n");
-			HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-			return -1;
-		}
-		else {
-			sprintf(TxBuffer, "write file error: %d\r\n", fres);
-			HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),HAL_MAX_DELAY);
-			return -2;
-		}
+
+		sprintf(TxBuffer, "write file error: %d\r\n", fres);
+		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer),HAL_MAX_DELAY);
+		return -2;
+
 	}
 	return 0;
 }
@@ -368,7 +365,7 @@ int close_file(FIL *target_file){
 float get_sensorval(sensor *current_sensor){
 	return current_sensor->calibration_slope;
 }
-uint16_t get_mcp3208_adcval(int channel, in cs, SPI_HandleTypeDef *spiHandle){
+uint16_t get_mcp3208_adcval(int channel, int cs, SPI_HandleTypeDef *spiHandle){
 	int status = 0;
 	uint8_t tx[3];
 	uint8_t rx[3];

@@ -2,7 +2,7 @@
 ../Core/Src/interface.c:180:5:parse_command_interface	1
 ../Core/Src/interface.c:184:5:read_file_interface	1
 ../Core/Src/interface.c:188:5:create_file_interface	1
-../Core/Src/interface.c:192:5:write_file_interface	1
+../Core/Src/interface.c:192:5:append_file_interface	1
 ../Core/Src/interface.c:195:5:mount_sd_interface	1
 ../Core/Src/interface.c:198:5:close_file_interface	1
 ../Core/Src/interface.c:201:7:get_sensorval_interface	1

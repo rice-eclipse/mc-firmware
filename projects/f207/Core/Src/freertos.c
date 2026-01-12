@@ -67,6 +67,7 @@ char sdcard_data[200];
 char logging_str[100];
 FIL data_file;
 FIL log_file;
+FRESULT fres;
 long tim14_tick_count;
 int tim13_tick_count;
 volatile int stop_logging;
@@ -201,6 +202,16 @@ void StartProcessingTask(void *argument)
   /* USER CODE BEGIN StartProcessingTask */
 	uint32_t processing_flag;
 	float *current_buffer;
+	fres = f_open(&data_file, "data.csv", 0x10 | FA_WRITE);
+	if (fres != FR_OK){
+	  		sprintf(tx_buffer, "Failed to open file for appending\r\n");
+	  		HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+	  	}
+	fres = f_open(&log_file, "console.log", 0x10 | FA_WRITE);
+	if (fres != FR_OK){
+	  		sprintf(tx_buffer, "Failed to open file for appending\r\n");
+	  		HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+	  	}
 	/*We sync the file to the sd card every second*/
 	int sync_count = 0;
 #ifndef TEST_LOGIC
@@ -233,7 +244,7 @@ void StartProcessingTask(void *argument)
 
 
 			  char single_sensor_data[10];
-			  sprintf(single_sensor_data,"%2f,",current_buffer[i]);
+			  sprintf(single_sensor_data,"%.2f,",current_buffer[i]);
 			  strcat(sdcard_data,single_sensor_data);
 		  }
 
@@ -253,12 +264,13 @@ void StartProcessingTask(void *argument)
 			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
 		  }
 #ifndef TEST_LOGIC
-		  fres = write_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
-		  fres = write_file_interface(&log_file, logging_str, strlen(logging_str));
+		  fres = append_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
+		  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
 
 		  /*sync data to SD card every second*/
 		  if (sync_count == 0){
 			  f_sync(&data_file);
+			  f_sync(&log_file);
 		  }
 	#endif
 	  }

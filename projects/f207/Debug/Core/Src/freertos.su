@@ -1,5 +1,5 @@
 ../Core/Src/freertos.c:114:6:MX_FREERTOS_Init	8	static
 ../Core/Src/freertos.c:167:6:StartCollectionTask	24	static
 ../Core/Src/freertos.c:200:6:StartProcessingTask	64	static
-../Core/Src/freertos.c:292:6:startShutdownTask	24	static
-../Core/Src/freertos.c:325:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/freertos.c:303:6:startShutdownTask	24	static
+../Core/Src/freertos.c:336:6:HAL_TIM_PeriodElapsedCallback	16	static

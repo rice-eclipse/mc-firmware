@@ -201,6 +201,7 @@ void StartProcessingTask(void *argument)
 {
   /* USER CODE BEGIN StartProcessingTask */
 	uint32_t processing_flag;
+	int sd_card_pos = 0;
 	float *current_buffer;
 	fres = f_open(&data_file, "data.csv", 0x10 | FA_WRITE);
 	if (fres != FR_OK){
@@ -241,15 +242,25 @@ void StartProcessingTask(void *argument)
 																	   current_buffer[i]);
 			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
 
-
-
-			  char single_sensor_data[10];
-			  sprintf(single_sensor_data,"%.2f,",current_buffer[i]);
-			  strcat(sdcard_data,single_sensor_data);
+			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f",current_buffer[i]);
+			  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
+				  sprintf(tx_buffer, "buffer full!\r\n");
+				  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+				  //drop the data in this cycle
+				  sd_card_pos = 0;
+				  break;
+			  }
 		  }
 
 		  char *end_str = "\r\n";
-		  strcat(sdcard_data,end_str);
+		  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "\r\n");
+		  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
+				  sprintf(tx_buffer, "buffer full!\r\n");
+				  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+				  //drop the data in this cycle
+				  sd_card_pos = 0;
+			  }
+		  sd_card_pos = 0;
 		  /*TODO: include timestamps from RTC*/
 
 		  sprintf(logging_str, "performed data sampling\r\n");

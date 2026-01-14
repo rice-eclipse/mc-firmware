@@ -63,7 +63,7 @@
 float sensor_vals[2*MAX_SENSOR_COUNT];
 char tx_buffer[300];
 //stores the sensor values in a single string to write to the sd card
-char sdcard_data[200];
+char sdcard_data[4096];
 char logging_str[100];
 FIL data_file;
 FIL log_file;
@@ -202,13 +202,16 @@ void StartProcessingTask(void *argument)
   /* USER CODE BEGIN StartProcessingTask */
 	uint32_t processing_flag;
 	int sd_card_pos = 0;
+	int log_count = 0;
 	float *current_buffer;
-	fres = f_open(&data_file, "data.csv", 0x10 | FA_WRITE);
+	fres = f_open(&data_file, "data.csv", FA_OPEN_ALWAYS | FA_WRITE);
+	//f_lseek(&file, f_size(&file));
 	if (fres != FR_OK){
 	  		sprintf(tx_buffer, "Failed to open file for appending\r\n");
 	  		HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
 	  	}
-	fres = f_open(&log_file, "console.log", 0x10 | FA_WRITE);
+	fres = f_open(&log_file, "console.log", FA_OPEN_ALWAYS | FA_WRITE);
+	//f_lseek(&file, f_size(&file));
 	if (fres != FR_OK){
 	  		sprintf(tx_buffer, "Failed to open file for appending\r\n");
 	  		HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
@@ -242,7 +245,7 @@ void StartProcessingTask(void *argument)
 																	   current_buffer[i]);
 			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
 
-			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f",current_buffer[i]);
+			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f,",current_buffer[i]);
 			  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
 				  sprintf(tx_buffer, "buffer full!\r\n");
 				  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
@@ -252,7 +255,6 @@ void StartProcessingTask(void *argument)
 			  }
 		  }
 
-		  char *end_str = "\r\n";
 		  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "\r\n");
 		  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
 				  sprintf(tx_buffer, "buffer full!\r\n");
@@ -260,24 +262,27 @@ void StartProcessingTask(void *argument)
 				  //drop the data in this cycle
 				  sd_card_pos = 0;
 			  }
-		  sd_card_pos = 0;
+		  log_count++;
+		  if (log_count == 20){
+			  sprintf(tx_buffer, "sd write\r\n");
+			  sprintf(logging_str,"sd write\r\n");
+			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+			  log_count = 0;
+
+#ifndef TEST_LOGIC
+			  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
+			  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
+#endif
+			  sd_card_pos = 0;
+			  memset(sdcard_data, 0, sizeof(sdcard_data));
+		  }
 		  /*TODO: include timestamps from RTC*/
-
-		  sprintf(logging_str, "performed data sampling\r\n");
-		  sprintf(tx_buffer, "logged: %s\r\n", sdcard_data);
-		 HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
-
-
-
 		  sync_count = (sync_count + 1) % sampling_freq_ign;
 		  if (sync_count == 0){
 			  sprintf(tx_buffer, "synced data\r\n");
 			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
 		  }
 #ifndef TEST_LOGIC
-		  fres = append_file_interface(&data_file, sdcard_data,strlen(sdcard_data));
-		  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
-
 		  /*sync data to SD card every second*/
 		  if (sync_count == 0){
 			  f_sync(&data_file);

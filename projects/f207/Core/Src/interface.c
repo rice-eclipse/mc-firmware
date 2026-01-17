@@ -130,6 +130,13 @@ int create_file_interface(FIL *target_file, const char *filename){
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	return 0;
 }
+
+int open_file_interface(FIL *target_file, const char *filename){
+	sprintf(TxBuffer,"[TEST] %s opened successfully \r\n", filename);
+		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		return 0;
+}
+
 int append_file_interface(FIL *target_file, char *data, UINT btw){
 	sprintf(TxBuffer, "wrote %s\r\n", data);
 	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -187,6 +194,10 @@ int read_file_interface(FIL *target_file, const char *filename, char *data_buffe
 
 int create_file_interface(FIL *target_file, const char *filename){
 	return create_file(target_file, filename);
+}
+
+int open_file_interface(FIL *target_file, const char *filename){
+		return open_file(target_file, filename);
 }
 
 int append_file_interface(FIL *target_file, char *data, UINT btw){

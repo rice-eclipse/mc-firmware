@@ -327,8 +327,6 @@ int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t 
 
 int create_file(FIL *target_file,const char *filename)
 {
-
-
     FRESULT fres;
     fres = f_open(target_file, filename, FA_WRITE |FA_CREATE_NEW);
     if (fres != FR_OK) {
@@ -338,8 +336,19 @@ int create_file(FIL *target_file,const char *filename)
     }
     f_close(target_file);
     return 0;
-
 }
+
+int open_file(FIL *target_file, const char *filename){
+	FRESULT fres;
+	fres = f_open(target_file, filename, FA_OPEN_ALWAYS|FA_WRITE);
+	if (fres != FR_OK){
+		sprintf(TxBuffer, "Failed to open %s for appending\r\n", filename);
+		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		return -2;
+	}
+	return 0;
+}
+
 int append_file(FIL *target_file, char *data, UINT btw){
 	FRESULT fres;
 	UINT bytes_written;
@@ -355,8 +364,14 @@ int append_file(FIL *target_file, char *data, UINT btw){
 }
 
 int mount_sd(FATFS *Fatfs)
-{
-    return (f_mount(Fatfs, "", 1));
+{	FRESULT fres;
+    fres = (f_mount(Fatfs, "", 1));
+    if (fres != FR_OK){
+    	sprintf(TxBuffer, "f_mount error (%i)\r\n", fres);
+    	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+    	return -1;
+    }
+    return 0;
 }
 
 int close_file(FIL *target_file){

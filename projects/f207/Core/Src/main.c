@@ -130,12 +130,7 @@ int main(void)
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
-   FRESULT fres = mount_sd_interface(&FatFs);
-   if (fres != FR_OK){
- 	  sprintf(TxBuffer,"f_mount error (%i)\r\n", fres);
- 	  HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
- 	  while(1);
-   }
+   mount_sd_interface(&FatFs);
 
    /*parse the configuration file to get the available
    	sensors and drivers*/

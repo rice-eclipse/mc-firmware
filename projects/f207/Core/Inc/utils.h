@@ -20,6 +20,7 @@ int parse_config(const char *config_str, driver *driver_list,sensor *sensor_list
 int parse_command(const char* json_string, int* driver_id, int* direction, driver *driver_list);
 int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size);
 int create_file(FIL *target_file,const char *filename);
+int open_file (FIL *target_file, const char *filename);
 int append_file(FIL *target_file, char *data, UINT btw);
 int mount_sd(FATFS* FatFs);
 int close_file(FIL *target_file);

@@ -204,18 +204,8 @@ void StartProcessingTask(void *argument)
 	int sd_card_pos = 0;
 	int log_count = 0;
 	float *current_buffer;
-	fres = f_open(&data_file, "data.csv", FA_OPEN_ALWAYS | FA_WRITE);
-	//f_lseek(&file, f_size(&file));
-	if (fres != FR_OK){
-	  		sprintf(tx_buffer, "Failed to open file for appending\r\n");
-	  		HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
-	  	}
-	fres = f_open(&log_file, "console.log", FA_OPEN_ALWAYS | FA_WRITE);
-	//f_lseek(&file, f_size(&file));
-	if (fres != FR_OK){
-	  		sprintf(tx_buffer, "Failed to open file for appending\r\n");
-	  		HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
-	  	}
+	open_file_interface(&data_file, "data.csv");
+	open_file_interface(&log_file, "console.log");
 	/*We sync the file to the sd card every second*/
 	int sync_count = 0;
 #ifndef TEST_LOGIC

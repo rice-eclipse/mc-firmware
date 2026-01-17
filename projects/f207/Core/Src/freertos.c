@@ -65,6 +65,7 @@ char tx_buffer[300];
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[4096];
 char logging_str[100];
+char data_header_str[300];
 FIL data_file;
 FIL log_file;
 FRESULT fres;
@@ -205,6 +206,7 @@ void StartProcessingTask(void *argument)
 	int log_count = 0;
 	float *current_buffer;
 	open_file_interface(&data_file, "data.csv");
+	add_datafile_header();
 	open_file_interface(&log_file, "console.log");
 	/*We sync the file to the sd card every second*/
 	int sync_count = 0;
@@ -290,7 +292,7 @@ void StartProcessingTask(void *argument)
 
 /* USER CODE BEGIN Header_startShutdownTask */
 /**
-* @brief stops logging &processing, and closes all the files when a shutdown condition is met
+* @brief stops logging & processing, and closes all the files when a shutdown condition is met
 * @param argument: Not used
 * @retval None
 */
@@ -355,6 +357,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
 
   /* USER CODE END Callback 1 */
+}
+
+void add_datafile_header(){
+	int card_pos = 0;
+	data_header_str[0] = '\0';
+	for (int i = 0; i < sensor_count; i++){
+		card_pos += snprintf(data_header_str+card_pos,sizeof(data_header_str) - card_pos,"%s,",
+							 sensor_list[i].name);
+		if (card_pos <= 0 || card_pos > sizeof(data_header_str)){
+			 sprintf(tx_buffer, "sensor list array corrupted!\r\n");
+			 HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+		}
+	}
+	card_pos += snprintf(data_header_str+card_pos, sizeof(data_header_str)-card_pos, "\r\n");
+	if (card_pos <= 0 || card_pos > sizeof(data_header_str)){
+			 sprintf(tx_buffer, "sensor list array corrupted!\r\n");
+			 HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+
+		}
+#ifndef TEST_LOGIC
+	append_file_interface(&data_file, data_header_str, card_pos);
+#endif
 }
 
 

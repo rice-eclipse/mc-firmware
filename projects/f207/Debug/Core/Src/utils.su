@@ -6,6 +6,6 @@
 ../Core/Src/utils.c:352:5:append_file	32	static
 ../Core/Src/utils.c:366:5:mount_sd	24	static
 ../Core/Src/utils.c:377:5:close_file	16	static
-../Core/Src/utils.c:380:7:get_sensorval	16	static
-../Core/Src/utils.c:383:10:get_mcp3208_adcval	48	static
-../Core/Src/utils.c:403:6:filter_and_decimate	16	static
+../Core/Src/utils.c:380:7:get_sensorval	32	static
+../Core/Src/utils.c:386:10:get_mcp3208_adcval	48	static
+../Core/Src/utils.c:406:6:filter_and_decimate	16	static

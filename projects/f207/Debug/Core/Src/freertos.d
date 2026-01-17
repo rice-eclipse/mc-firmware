@@ -56,8 +56,8 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Middlewares/Third_Party/FatFs/src/ff.h \
  ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h \
  ../Core/Inc/utils.h ../FATFS/App/fatfs.h ../Core/Inc/cJSON.h \
- ../Core/Inc/usart.h ../Core/Inc/tim.h ../Core/Inc/gpio.h \
- ../Core/Inc/sdio.h
+ ../Core/Inc/usart.h ../Core/Inc/spi.h ../Core/Inc/tim.h \
+ ../Core/Inc/gpio.h ../Core/Inc/sdio.h
 ../Middlewares/Third_Party/FreeRTOS/Source/include/FreeRTOS.h:
 ../Core/Inc/FreeRTOSConfig.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/include/projdefs.h:
@@ -123,6 +123,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../FATFS/App/fatfs.h:
 ../Core/Inc/cJSON.h:
 ../Core/Inc/usart.h:
+../Core/Inc/spi.h:
 ../Core/Inc/tim.h:
 ../Core/Inc/gpio.h:
 ../Core/Inc/sdio.h:

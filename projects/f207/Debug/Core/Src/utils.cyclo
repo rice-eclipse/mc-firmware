@@ -7,5 +7,5 @@
 ../Core/Src/utils.c:366:5:mount_sd	2
 ../Core/Src/utils.c:377:5:close_file	1
 ../Core/Src/utils.c:380:7:get_sensorval	1
-../Core/Src/utils.c:383:10:get_mcp3208_adcval	1
-../Core/Src/utils.c:403:6:filter_and_decimate	1
+../Core/Src/utils.c:386:10:get_mcp3208_adcval	1
+../Core/Src/utils.c:406:6:filter_and_decimate	1

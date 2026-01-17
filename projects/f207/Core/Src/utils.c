@@ -378,9 +378,12 @@ int close_file(FIL *target_file){
 	return f_close(target_file);
 }
 float get_sensorval(sensor *current_sensor){
-	return current_sensor->calibration_slope;
+	uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
+	float voltage = (adc_val)*4.096/4096;
+	float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
+	return sensor_val;
 }
-uint16_t get_mcp3208_adcval(int channel, int cs, SPI_HandleTypeDef *spiHandle){
+uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle){
 	int status = 0;
 	uint8_t tx[3];
 	uint8_t rx[3];

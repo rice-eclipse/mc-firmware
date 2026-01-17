@@ -56,7 +56,8 @@ Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
  ../Middlewares/Third_Party/FatFs/src/ff.h \
  ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h \
  ../Core/Inc/utils.h ../FATFS/App/fatfs.h ../Core/Inc/cJSON.h \
- ../Core/Inc/usart.h ../Core/Inc/utils.h ../Core/Inc/adc.h
+ ../Core/Inc/usart.h ../Core/Inc/spi.h ../Core/Inc/utils.h \
+ ../Core/Inc/adc.h
 ../Core/Inc/interface.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal.h:
@@ -121,5 +122,6 @@ Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
 ../FATFS/App/fatfs.h:
 ../Core/Inc/cJSON.h:
 ../Core/Inc/usart.h:
+../Core/Inc/spi.h:
 ../Core/Inc/utils.h:
 ../Core/Inc/adc.h:

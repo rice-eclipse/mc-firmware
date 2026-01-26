@@ -25,6 +25,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_flash_ex.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr_ex.h \
+ ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rng.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rtc.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rtc_ex.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_sd.h \
@@ -55,10 +56,11 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/ff.h \
  ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h \
- ../Core/Inc/rtc.h ../Core/Inc/sdio.h ../Core/Inc/spi.h ../Core/Inc/tim.h \
- ../Core/Inc/usart.h ../Core/Inc/usb_otg.h ../Core/Inc/gpio.h \
- ../Core/Inc/interface.h ../FATFS/App/Fatfs.h ../Core/Inc/utils.h \
- ../Core/Inc/cJSON.h ../Core/Inc/usart.h ../Core/Inc/spi.h
+ ../Core/Inc/rng.h ../Core/Inc/rtc.h ../Core/Inc/sdio.h ../Core/Inc/spi.h \
+ ../Core/Inc/tim.h ../Core/Inc/usart.h ../Core/Inc/usb_otg.h \
+ ../Core/Inc/gpio.h ../Core/Inc/interface.h ../FATFS/App/Fatfs.h \
+ ../Core/Inc/utils.h ../Core/Inc/cJSON.h ../Core/Inc/usart.h \
+ ../Core/Inc/spi.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal.h:
 ../Core/Inc/stm32f2xx_hal_conf.h:
@@ -86,6 +88,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_flash_ex.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr_ex.h:
+../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rng.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rtc.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rtc_ex.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_sd.h:
@@ -119,6 +122,7 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Middlewares/Third_Party/FatFs/src/diskio.h:
 ../Middlewares/Third_Party/FatFs/src/ff.h:
 ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h:
+../Core/Inc/rng.h:
 ../Core/Inc/rtc.h:
 ../Core/Inc/sdio.h:
 ../Core/Inc/spi.h:

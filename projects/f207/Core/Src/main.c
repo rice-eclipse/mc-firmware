@@ -21,6 +21,7 @@
 #include "cmsis_os.h"
 #include "adc.h"
 #include "fatfs.h"
+#include "rng.h"
 #include "rtc.h"
 #include "sdio.h"
 #include "spi.h"
@@ -75,6 +76,7 @@ int port = 0;
 int sampling_freq_ign = 0;
 int sampling_freq_standby = 0;
 char *console_filename = NULL;
+char cmd_password[MAX_PWD_LENGTH];
 char *data_filename = NULL;
 char *cmd_buffer = NULL;
 char host_ip[MAX_IP_LEN];
@@ -83,6 +85,7 @@ int sensor_count = MAX_SENSOR_COUNT;
 int driver_count = MAX_DRIVER_COUNT;
 int monitor_count = MAX_MONITOR_COUNT;
 driver driver_list[MAX_DRIVER_COUNT];
+driver ignition;
 monitor monitor_list[MAX_MONITOR_COUNT];
 sensor sensor_list[MAX_SENSOR_COUNT];
 
@@ -127,6 +130,7 @@ int main(void)
   MX_SPI2_Init();
   MX_TIM13_Init();
   MX_RTC_Init();
+  MX_RNG_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
@@ -135,7 +139,7 @@ int main(void)
    /*parse the configuration file to get the available
    	sensors and drivers*/
      read_file_interface(&config_file, "config.json", config_str,4000);
-     parse_config_interface(config_str, driver_list, sensor_list, monitor_list, host_ip, &port, &sampling_freq_ign, &sampling_freq_standby,
+     parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password, &port, &sampling_freq_ign, &sampling_freq_standby,
    		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
 
   /* USER CODE END 2 */
@@ -212,8 +216,6 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
-
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None

@@ -14,11 +14,12 @@
 
 #define unmount_sd_interface() mount_sd_interface(0)
 
-int parse_config_interface(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list,
-				 char *host_ip,int *port,int *sampling_freq_ign,int *sampling_freq_standby,
+int parse_config_interface(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list, driver *ignition,
+				 char *host_ip, char *password, int *port, int *sampling_freq_ign, int *sampling_freq_standby,
 				 int *driver_count, int *sensor_count, int *monitor_count);
 
-int parse_command_interface(const char* json_string, int* driver_id, int* direction, driver *driver_list);
+int parse_command_interface(const char* json_string, int* driver_id, int* direction, driver *driver_list, int *ignition_flag,
+		  int *shutdown_flag, int *cancel_ignition_flag);
 int read_file_interface(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size);
 int create_file_interface(FIL *target_file, const char *filename);
 int open_file_interface (FIL *target_file, const char *filename);

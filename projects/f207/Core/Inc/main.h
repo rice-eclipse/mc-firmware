@@ -66,13 +66,15 @@ typedef struct{
 #define MAX_MONITOR_COUNT 7
 #define MAX_IP_LEN 16
 #define FIR_LENGTH 16
-
+#define MAX_PWD_LENGTH 15
 
 
 extern sensor sensor_list[MAX_SENSOR_COUNT];
 extern driver driver_list[MAX_DRIVER_COUNT];
 extern monitor monitor_list[MAX_MONITOR_COUNT];
+extern driver ignition;
 extern char host_ip[MAX_IP_LEN];
+extern char cmd_password[MAX_PWD_LENGTH];
 extern int port;
 extern int sampling_freq_ign;
 extern int sampling_freq_standby;

@@ -98,7 +98,7 @@ const osThreadAttr_t shutdownTask_attributes = {
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
-
+void add_datafile_header();
 /* USER CODE END FunctionPrototypes */
 
 void StartCollectionTask(void *argument);

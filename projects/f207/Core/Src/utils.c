@@ -15,7 +15,9 @@ int parse_config(const char *config_str,
                  driver *driver_list,
                  sensor *sensor_list,
                  monitor *monitor_list,
+				 driver *ignition,
                  char *host_ip,
+				 char *password,
                  int *port,
                  int *sampling_freq_ign,
                  int *sampling_freq_standby,
@@ -24,6 +26,7 @@ int parse_config(const char *config_str,
 				 int *monitor_count)
 {
     const cJSON *host = NULL;
+    const cJSON *pwd = NULL;
     const cJSON *host_children = NULL;
     const cJSON *sampling_f_ign = NULL;
     const cJSON *sampling_f_standby = NULL;
@@ -48,7 +51,7 @@ int parse_config(const char *config_str,
     }
     host_children = host->child;
 
-    /* Example: copy host IP if you want it */
+
     if (host_children != NULL && host_children->valuestring != NULL && host_ip != NULL) {
         strcpy(host_ip, host_children->valuestring);
     }
@@ -61,6 +64,13 @@ int parse_config(const char *config_str,
         goto end;
     }
     *sampling_freq_ign = sampling_f_ign->valueint;
+
+    pwd = cJSON_GetObjectItemCaseSensitive(config_json, "password");
+    if (pwd == NULL){
+    	status = 1;
+    	goto end;
+    }
+    strcpy(password, pwd->valuestring);
 
     sampling_f_standby = cJSON_GetObjectItemCaseSensitive(config_json, "sampling_freq_standby");
     if (sampling_f_standby == NULL) {
@@ -181,16 +191,15 @@ int parse_config(const char *config_str,
     /* ignition config */
     ignition_obj = cJSON_GetObjectItemCaseSensitive(config_json, "ignition");
     if (ignition_obj != NULL) {
-    	driver ignition;
         char *gpio_port = cJSON_GetObjectItemCaseSensitive(ignition_obj, "gpio_port")->valuestring;
         if (strcmp(gpio_port, "GPIOA") == 0) {
-            ignition.GPIO_Port = GPIOA;
+            ignition->GPIO_Port = GPIOA;
         } else if (strcmp(gpio_port, "GPIOB") == 0) {
-            ignition.GPIO_Port = GPIOB;
+            ignition->GPIO_Port = GPIOB;
         } else {
-            ignition.GPIO_Port = GPIOC;
+            ignition->GPIO_Port = GPIOC;
         }
-        ignition.GPIO_Pin = IGN_Pin;
+        ignition->GPIO_Pin = IGN_Pin;
     }
 
     /* monitors */
@@ -242,13 +251,17 @@ end:
     return status;
 }
 
-int parse_command(const char *json_string, int *driver_id, int *direction, driver *driver_list)
-{
+int parse_command(const char *json_string, int *driver_id, int *direction, driver *driver_list, int *ignition_flag,
+				  int *shutdown_flag, int *cancel_ignition_flag){
     // CJSON variables to extract the relevant fields
     cJSON *cmd_type = NULL;
     cJSON *drv_id = NULL;
+    cJSON* pwd = NULL;
     cJSON *dir = NULL;
     int status = 0;
+    *ignition_flag = 0;
+    *shutdown_flag = 0;
+    *cancel_ignition_flag = 0;
 
     cJSON *cmd = cJSON_Parse(json_string);
     if (cmd == NULL) {
@@ -263,16 +276,18 @@ int parse_command(const char *json_string, int *driver_id, int *direction, drive
 
     cmd_type = cJSON_GetObjectItemCaseSensitive(cmd, "type");
     /* If an actuate command is given, parse the target driver and the direction */
-    if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "actuate") == 0) {
-        drv_id = cJSON_GetObjectItemCaseSensitive(cmd, "driver-id");
+    if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "Actuate") == 0) {
+        drv_id = cJSON_GetObjectItemCaseSensitive(cmd, "driver_id");
+        pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
         // if the input driver id is valid and the direction is valid, save the id and direction
-        if (cJSON_IsNumber(drv_id)) {
+        if (cJSON_IsNumber(drv_id) && strcmp(pwd->valuestring, cmd_password) == 0) {
             dir = cJSON_GetObjectItemCaseSensitive(cmd, "direction");
             if (cJSON_IsNumber(dir)) {
                 *driver_id = drv_id->valueint;
                 *direction = dir->valueint;
                 HAL_GPIO_WritePin(driver_list[*driver_id].GPIO_Port, driver_list[*driver_id].GPIO_Pin, *direction);
                 status = 0;
+                goto end;
             } else {
                 status = 1;
                 goto end;
@@ -281,6 +296,41 @@ int parse_command(const char *json_string, int *driver_id, int *direction, drive
             status = 1;
             goto end;
         }
+    }
+    else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "Ignition")){
+    	pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
+    	if (strcmp(pwd->valuestring,cmd_password) == 0){
+    		*ignition_flag = 1;
+    		status = 0;
+    		goto end;
+    	} else{
+    		status = 1;
+    		goto end;
+    	}
+    }
+    else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "CancelIgnition")){
+    	pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
+    	if (strcmp(pwd->valuestring, cmd_password) == 0){
+    		*cancel_ignition_flag = 1;
+    		status = 0;
+    		goto end;
+    	} else{
+    		status = 1;
+    		goto end;
+    	}
+    } else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "close")){
+    	pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
+		if (strcmp(pwd->valuestring, cmd_password) == 0){
+			*shutdown_flag = 1;
+			status = 0;
+			goto end;
+		} else{
+			status = 1;
+			goto end;
+		}
+    } else{
+    	status = 1;
+    	goto end;
     }
 
 end:
@@ -384,7 +434,6 @@ float get_sensorval(sensor *current_sensor){
 	return sensor_val;
 }
 uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle){
-	int status = 0;
 	uint8_t tx[3];
 	uint8_t rx[3];
 
@@ -404,5 +453,10 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	return dataBuff;
 }
 void filter_and_decimate(float *sensor_vals, int sensor_count){
+	return;
+}
+
+void ignition_sequence(){
+	HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
 	return;
 }

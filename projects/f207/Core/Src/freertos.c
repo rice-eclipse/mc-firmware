@@ -51,6 +51,7 @@
 #define SAMPLE_NOW (1 << 2)
 #define SHUTDOWN (1 << 3)
 #define LOGGING_STOPPED (1 << 4)
+#define MSG_RECEIVED (1 << 5)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -66,6 +67,7 @@ char tx_buffer[300];
 char sdcard_data[4096];
 char logging_str[100];
 char data_header_str[300];
+char cmd_str[100];
 FIL data_file;
 FIL log_file;
 FRESULT fres;
@@ -78,7 +80,7 @@ volatile int stop_logging;
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
   .name = "collectionTask",
-  .stack_size = 256 * 4,
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for processingTask */
@@ -92,8 +94,15 @@ const osThreadAttr_t processingTask_attributes = {
 osThreadId_t shutdownTaskHandle;
 const osThreadAttr_t shutdownTask_attributes = {
   .name = "shutdownTask",
-  .stack_size = 256 * 4,
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for cmdHandlingTask */
+osThreadId_t cmdHandlingTaskHandle;
+const osThreadAttr_t cmdHandlingTask_attributes = {
+  .name = "cmdHandlingTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh1,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -104,6 +113,7 @@ void add_datafile_header();
 void StartCollectionTask(void *argument);
 void StartProcessingTask(void *argument);
 void startShutdownTask(void *argument);
+void StartCmdHandlingTask(void *argument);
 
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -145,6 +155,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of shutdownTask */
   shutdownTaskHandle = osThreadNew(startShutdownTask, NULL, &shutdownTask_attributes);
+
+  /* creation of cmdHandlingTask */
+  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -326,6 +339,42 @@ void startShutdownTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END startShutdownTask */
+}
+
+/* USER CODE BEGIN Header_StartCmdHandlingTask */
+/**
+* @brief Function implementing the cmdHandlingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCmdHandlingTask */
+void StartCmdHandlingTask(void *argument)
+{
+  /* USER CODE BEGIN StartCmdHandlingTask */
+	uint32_t msg_received_flag;
+	int ignition_flag;
+	int shutdown_flag;
+	int stop_ignition_flag;
+	int driver_id;
+	int direction;
+  /* Infinite loop */
+  for(;;)
+  {
+	msg_received_flag = osThreadFlagsWait(MSG_RECEIVED, osFlagsWaitAny, osWaitForever);
+	parse_command_interface(cmd_str, &driver_id, &direction, driver_list, &ignition_flag,
+			  	  	  	  	  	&shutdown_flag, &stop_ignition_flag);
+	if (shutdown_flag == 1){
+		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
+	}
+	else if (stop_ignition_flag == 1){
+		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+	}
+	else if (ignition_flag == 1){
+		ignition_sequence();
+	}
+    osDelay(1);
+  }
+  /* USER CODE END StartCmdHandlingTask */
 }
 
 /* Private application code --------------------------------------------------*/

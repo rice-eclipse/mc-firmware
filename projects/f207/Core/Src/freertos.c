@@ -67,7 +67,8 @@ char tx_buffer[300];
 char sdcard_data[4096];
 char logging_str[100];
 char data_header_str[300];
-char cmd_str[100];
+char cmd_str_a[100];
+char cmd_str_b[100];
 FIL data_file;
 FIL log_file;
 FRESULT fres;
@@ -103,6 +104,11 @@ const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
+};
+/* Definitions for commandQueue */
+osMessageQueueId_t commandQueueHandle;
+const osMessageQueueAttr_t commandQueue_attributes = {
+  .name = "commandQueue"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -141,6 +147,10 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
+
+  /* Create the queue(s) */
+  /* creation of commandQueue */
+  commandQueueHandle = osMessageQueueNew (10, sizeof(char*), &commandQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -351,7 +361,8 @@ void startShutdownTask(void *argument)
 void StartCmdHandlingTask(void *argument)
 {
   /* USER CODE BEGIN StartCmdHandlingTask */
-	uint32_t msg_received_flag;
+	osStatus_t status;
+	char *cmd_str;
 	int ignition_flag;
 	int shutdown_flag;
 	int stop_ignition_flag;
@@ -360,7 +371,9 @@ void StartCmdHandlingTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	msg_received_flag = osThreadFlagsWait(MSG_RECEIVED, osFlagsWaitAny, osWaitForever);
+	// receives the incoming command from the websocket event handler
+	  //TODO: handle queue erros
+	status = osMessageQueueGet(commandQueueHandle, &cmd_str,NULL,osWaitForever);
 	parse_command_interface(cmd_str, &driver_id, &direction, driver_list, &ignition_flag,
 			  	  	  	  	  	&shutdown_flag, &stop_ignition_flag);
 	if (shutdown_flag == 1){

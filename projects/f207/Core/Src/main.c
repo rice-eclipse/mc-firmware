@@ -131,6 +131,7 @@ int main(void)
   MX_TIM13_Init();
   MX_RTC_Init();
   MX_RNG_Init();
+  MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);

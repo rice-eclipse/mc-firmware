@@ -25,7 +25,6 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
 #include <string.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -41,7 +40,6 @@
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 
-
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -52,6 +50,8 @@
 #define SHUTDOWN (1 << 3)
 #define LOGGING_STOPPED (1 << 4)
 #define MSG_RECEIVED (1 << 5)
+#define SENDING_BUF_READY (1 << 6)
+#define SEND_NOW (1 << 7)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -62,13 +62,13 @@
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
 float sensor_vals[2*MAX_SENSOR_COUNT];
+float vals_to_send[MAX_SENSOR_COUNT];
 char tx_buffer[300];
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[4096];
 char logging_str[100];
 char data_header_str[300];
-char cmd_str_a[100];
-char cmd_str_b[100];
+char cmd_str[100];
 FIL data_file;
 FIL log_file;
 FRESULT fres;
@@ -105,10 +105,10 @@ const osThreadAttr_t cmdHandlingTask_attributes = {
   .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
 };
-/* Definitions for commandQueue */
-osMessageQueueId_t commandQueueHandle;
-const osMessageQueueAttr_t commandQueue_attributes = {
-  .name = "commandQueue"
+/* Definitions for valsToSendMutex */
+osMutexId_t valsToSendMutexHandle;
+const osMutexAttr_t valsToSendMutex_attributes = {
+  .name = "valsToSendMutex"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -135,6 +135,9 @@ void MX_FREERTOS_Init(void) {
 	create_file_interface(&data_file,"data.csv");
 	create_file_interface(&log_file,"console.log");
   /* USER CODE END Init */
+  /* Create the mutex(es) */
+  /* creation of valsToSendMutex */
+  valsToSendMutexHandle = osMutexNew(&valsToSendMutex_attributes);
 
   /* USER CODE BEGIN RTOS_MUTEX */
   /* add mutexes, ... */
@@ -147,10 +150,6 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN RTOS_TIMERS */
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
-
-  /* Create the queue(s) */
-  /* creation of commandQueue */
-  commandQueueHandle = osMessageQueueNew (10, sizeof(char*), &commandQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -191,23 +190,37 @@ void MX_FREERTOS_Init(void) {
 void StartCollectionTask(void *argument)
 {
   /* USER CODE BEGIN StartCollectionTask */
+	//used to determine which of the buffers have been filled when copying to the 'vals_to_send' buffer
+	 float *curr_buffer;
 	 HAL_TIM_Base_Start_IT(&htim14);
 	 HAL_TIM_Base_Start_IT(&htim13);
+	 HAL_TIM_Base_Start_IT(&htim11);
 	int sample_count = 0;
-	uint32_t sampling_flag;
+	uint32_t sending_flag;
+	osStatus_t mutex_status;
   /* Infinite loop */
   for(;;)
   {
-	  sampling_flag = osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
+	 osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
 	 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
 	 sample_count = (sample_count + 1) % (sensor_count*2);
 
 	 //First Buffer has been filled
 	 if (sample_count == sensor_count){
 		 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+		 curr_buffer = &sensor_vals[0];
 	 }
 	 else if (sample_count == 0){
 		 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+		 curr_buffer = &sensor_vals[sensor_count];
+	 }
+	 //check if it is time to send the data to mission control
+	 sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
+	 if (sending_flag & SEND_NOW){
+		 mutex_status = osMutexAcquire(valsToSendMutexHandle, 0);
+		 if (mutex_status == osOK)
+			 memcpy(vals_to_send, curr_buffer, sensor_count);
+		 osMutexRelease(valsToSendMutexHandle);
 	 }
 	 osDelay(1);
   }
@@ -361,8 +374,7 @@ void startShutdownTask(void *argument)
 void StartCmdHandlingTask(void *argument)
 {
   /* USER CODE BEGIN StartCmdHandlingTask */
-	osStatus_t status;
-	char *cmd_str;
+	uint32_t msg_received_flag;
 	int ignition_flag;
 	int shutdown_flag;
 	int stop_ignition_flag;
@@ -371,9 +383,7 @@ void StartCmdHandlingTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	// receives the incoming command from the websocket event handler
-	  //TODO: handle queue erros
-	status = osMessageQueueGet(commandQueueHandle, &cmd_str,NULL,osWaitForever);
+	msg_received_flag = osThreadFlagsWait(MSG_RECEIVED, osFlagsWaitAny, osWaitForever);
 	parse_command_interface(cmd_str, &driver_id, &direction, driver_list, &ignition_flag,
 			  	  	  	  	  	&shutdown_flag, &stop_ignition_flag);
 	if (shutdown_flag == 1){
@@ -407,6 +417,12 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
 	  HAL_GPIO_TogglePin(GPIOB, LD1_Pin);
   }
+  if (htim->Instance  == TIM11){
+	  /*Data sending event has occured*/
+	  osThreadFlagsSet(collectionTaskHandle, SEND_NOW);
+	  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
+  }
+
   if (htim->Instance == TIM13){
 	  /*shutdown condition has occured*/
 	  if (tim13_tick_count == 1){

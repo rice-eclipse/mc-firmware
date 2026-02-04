@@ -21,6 +21,7 @@
 #include "cmsis_os.h"
 #include "adc.h"
 #include "fatfs.h"
+#include "lwip.h"
 #include "rng.h"
 #include "rtc.h"
 #include "sdio.h"
@@ -217,6 +218,8 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+
 
 /**
   * @brief  This function is executed in case of error occurrence.

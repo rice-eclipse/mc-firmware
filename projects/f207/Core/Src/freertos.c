@@ -121,6 +121,7 @@ void StartProcessingTask(void *argument);
 void startShutdownTask(void *argument);
 void StartCmdHandlingTask(void *argument);
 
+extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
@@ -189,6 +190,8 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartCollectionTask */
 void StartCollectionTask(void *argument)
 {
+  /* init code for LWIP */
+  MX_LWIP_Init();
   /* USER CODE BEGIN StartCollectionTask */
 	//used to determine which of the buffers have been filled when copying to the 'vals_to_send' buffer
 	 float *curr_buffer;

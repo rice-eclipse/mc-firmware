@@ -27,12 +27,14 @@
 /* USER CODE BEGIN Includes */
 #include "mongoose.h"
 #include "lwip.h"
+#include "interface.h"
+#include "usart.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
 typedef struct{
-	char cmd_buf[32];
+	char cmd_buf[200];
 	uint8_t cmd_idx;
 } CMDQUEUE_OBJ_T;
 /* USER CODE END PTD */
@@ -56,6 +58,7 @@ static const char *s_cert_path = "cert.pem";
 static const char *s_key_path = "key.pem";
 struct mg_str s_ca, s_cert, s_key;
 uint8_t current_cmd_idx;
+static char TxBuffer[300];
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -232,6 +235,10 @@ void StartCmdHandlingTask(void *argument)
 	}
 	else if (actuation_flag == 1){
 		HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
+		sprintf(TxBuffer, "Actuating Driver %u. Direction: %d", driver_list[driver_id].GPIO_Pin, direction);
+		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+
 	}
     osDelay(1);
   }

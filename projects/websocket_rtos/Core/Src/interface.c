@@ -75,50 +75,48 @@ int parse_config_interface(const char *config_str, driver *driver_list,sensor *s
 	    }
 	    *sampling_freq_standby = sampling_f_standby->valueint;
 	    sensors = cJSON_GetObjectItemCaseSensitive(config_json, "sensors");
-	    if (!cJSON_IsArray(sensors)) {
-	        status = 1;
-	        goto end;
-	    }
-	    int num_sensors = cJSON_GetArraySize(sensors);
-	    if (num_sensors > MAX_SENSOR_COUNT){
-	    	sprintf(TxBuffer,"config has too many sensors");
-	    	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer,strlen(TxBuffer),HAL_MAX_DELAY);
-	    	return -2;
-	    }
-	    int curr_sensor = 0;
-	    int cs_pin =0;
-	    cJSON_ArrayForEach(sensor_obj, sensors) {
-	        char *enabled = cJSON_GetObjectItemCaseSensitive(sensor_obj, "enabled")->valuestring;
-	        if (strcmp(enabled,"true") == 0) {
-	            sensor new_sensor;
-	            new_sensor.name = strdup(cJSON_GetObjectItemCaseSensitive(sensor_obj, "sensor")->valuestring);
-	            new_sensor.channel = cJSON_GetObjectItemCaseSensitive(sensor_obj, "channel")->valueint;
-	            cs_pin = cJSON_GetObjectItemCaseSensitive(sensor_obj, "adc_cs")->valueint;
-	            new_sensor.calibration_int =
-	                (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_intercept")->valuedouble;
-	            new_sensor.calibration_slope =
-	                (float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_slope")->valuedouble;
+	    if (cJSON_IsArray(sensors)) {
+			int num_sensors = cJSON_GetArraySize(sensors);
+			if (num_sensors > MAX_SENSOR_COUNT){
+				sprintf(TxBuffer,"config has too many sensors");
+				HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer,strlen(TxBuffer),HAL_MAX_DELAY);
+				return -2;
+			}
+			int curr_sensor = 0;
+			int cs_pin =0;
+			cJSON_ArrayForEach(sensor_obj, sensors) {
+				char *enabled = cJSON_GetObjectItemCaseSensitive(sensor_obj, "enabled")->valuestring;
+				if (strcmp(enabled,"true") == 0) {
+					sensor new_sensor;
+					new_sensor.name = strdup(cJSON_GetObjectItemCaseSensitive(sensor_obj, "sensor")->valuestring);
+					new_sensor.channel = cJSON_GetObjectItemCaseSensitive(sensor_obj, "channel")->valueint;
+					cs_pin = cJSON_GetObjectItemCaseSensitive(sensor_obj, "adc_cs")->valueint;
+					new_sensor.calibration_int =
+						(float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_intercept")->valuedouble;
+					new_sensor.calibration_slope =
+						(float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_slope")->valuedouble;
 
-	            switch (cs_pin){
-	            case 1:
-	            	new_sensor.adc_cs = 1;
-	            	break;
-	            case 2:
-	            	new_sensor.adc_cs = 1;
-	            	break;
-	            	break;
-	            //need to do some error handling here
-	            default:
-	            	new_sensor.adc_cs = 1;
-	            	break;
-	            }
+					switch (cs_pin){
+					case 1:
+						new_sensor.adc_cs = 1;
+						break;
+					case 2:
+						new_sensor.adc_cs = 1;
+						break;
+						break;
+					//need to do some error handling here
+					default:
+						new_sensor.adc_cs = 1;
+						break;
+					}
 
-	            sensor_list[curr_sensor] = new_sensor;
-	            curr_sensor++;
-	        }
+					sensor_list[curr_sensor] = new_sensor;
+					curr_sensor++;
+				}
+			}
+			//update the sensor count with the true number of sensors
+			*sensor_count = curr_sensor;
 	    }
-	    //update the sensor count with the true number of sensors
-	    *sensor_count = curr_sensor;
 	    drivers = cJSON_GetObjectItemCaseSensitive(config_json, "drivers");
 	    if (cJSON_IsArray(drivers)) {
 	        int num_drivers = cJSON_GetArraySize(drivers);
@@ -239,40 +237,41 @@ int parse_config_interface(const char *config_str, driver *driver_list,sensor *s
 int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
 
 	const char *config_str2 =
-			"{"
-			"\"host\": {\"ip\": \"127.0.0.1\"},"
-			"\"password\":\"quonk\","
-			"\"port\": 1234,"
-			"\"sampling_freq_ignition\": 5000,"
-			"\"sampling_freq_standby\": 1,"
-			"\"drivers\": ["
-			"  {"
-			"    \"driver\": \"D1: Ox Fill\","
-			"    \"gpio_pin\": DRV0_Pin,"
-			"    \"gpio_port\": GPIOB,"
-			"    \"channel\": 2,"
-			"    \"adc_cs\": 2,"
-			"    \"enabled\": \"true\""
-			"  },"
-			"  {"
-			"    \"driver\": \"D2: Ground Vent\","
-			"    \"gpio_pin\": DRV1_Pin,"
-			"    \"gpio_port\": GPIOB,"
-			"    \"calibration_intercept\": 32,"
-			"    \"channel\": 1,"
-			"    \"adc_cs\": 2,"
-			"	 \"enabled\": \"true\""
-			"  },"
-			"  {"
-			"    \"driver\": \"D3: Engine Vent\","
-			"    \"gpio_pin\": DRV3_Pin,"
-			"    \"gpio_port\": 3,"
-			"    \"channel\": 3,"
-			"    \"adc_cs\": 2,"
-			"    \"enabled\": \"true\""
-			"  }"
-			"]"
-			"}";
+	"{"
+	"\"host\": {\"ip\": \"127.0.0.1\"},"
+	"\"password\": \"quonk\","
+	"\"port\": 1234,"
+	"\"sampling_freq_ignition\": 5000,"
+	"\"sampling_freq_standby\": 1,"
+	"\"drivers\": ["
+	"  {"
+	"    \"driver\": \"D1: Ox Fill\","
+	"    \"gpio_pin\": 0,"
+	"    \"gpio_port\": \"GPIOB\","
+	"    \"channel\": 2,"
+	"    \"adc_cs\": 2,"
+	"    \"enabled\": \"true\""
+	"  },"
+	"  {"
+	"    \"driver\": \"D2: Ground Vent\","
+	"    \"gpio_pin\": 1,"
+	"    \"gpio_port\": \"GPIOB\","
+	"    \"calibration_intercept\": 32,"
+	"    \"channel\": 1,"
+	"    \"adc_cs\": 2,"
+	"    \"enabled\": \"true\""
+	"  },"
+	"  {"
+	"    \"driver\": \"D3: Engine Vent\","
+	"    \"gpio_pin\": 2,"
+	"    \"gpio_port\": \"GPIOC\","
+	"    \"channel\": 3,"
+	"    \"adc_cs\": 2,"
+	"    \"enabled\": \"true\""
+	"  }"
+	"]"
+	"}";
+
 
 
 	int config_len = strlen(config_str2);
@@ -331,6 +330,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	cJSON *cmd_type = NULL;
 	cJSON *drv_id = NULL;
 	cJSON *dir = NULL;
+	cJSON *password = NULL;
 	int status = 0;
 
 	cJSON *cmd = cJSON_Parse(json_string);
@@ -344,19 +344,26 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 		goto end;
 	}
 
+	password = cJSON_GetObjectItemCaseSensitive(cmd,"password");
+	if (strcmp(password->valuestring, "quonk") != 0){
+		sprintf(TxBuffer, "Incorrect Password\r\n");
+		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		*actuation_flag = 0;
+		status = 1;
+		goto end;
+	}
 	cmd_type = cJSON_GetObjectItemCaseSensitive(cmd, "type");
 	/* If an actuate command is given, parse the target driver and the direction */
 	if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "actuate") == 0) {
 		drv_id = cJSON_GetObjectItemCaseSensitive(cmd, "driver-id");
 		// if the input driver id is valid and the direction is valid, save the id and direction
 		if (cJSON_IsNumber(drv_id)) {
-			dir = cJSON_GetObjectItemCaseSensitive(cmd, "direction");
+			dir = cJSON_GetObjectItemCaseSensitive(cmd, "value");
 			if (cJSON_IsNumber(dir)) {
 				*driver_id = drv_id->valueint;
 				*direction = dir->valueint;
 				*actuation_flag = 1;
-				sprintf(TxBuffer, "Actuating Driver %d. Direction: %d", driver_list[*driver_id].GPIO_Pin, *direction);
-				HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+
 				status = 0;
 			} else {
 				status = 1;

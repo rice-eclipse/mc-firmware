@@ -31,9 +31,9 @@
     send.onclick = function() {
       if (!ws) return;
       msg = JSON.stringify({
-                "type": "Actuate",
-                "driver_id": driver_id.value,
-                "value": direction.value,
+                "type": "actuate",
+                "driver-id": Number(driver_id.value),
+                "value": Number(direction.value),
                 "password": password.value
             });
       log.innerHTML += 'SENT: ' + msg + '<br/>';

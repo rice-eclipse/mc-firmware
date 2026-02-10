@@ -22,7 +22,6 @@ Drivers/STM32F2xx_HAL_Driver/Src/stm32f2xx_hal_exti.o: \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_cortex.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_adc.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_adc_ex.h \
- ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_eth.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_flash.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_flash_ex.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr.h \
@@ -61,7 +60,6 @@ Drivers/STM32F2xx_HAL_Driver/Src/stm32f2xx_hal_exti.o: \
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_cortex.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_adc.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_adc_ex.h:
-../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_eth.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_flash.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_flash_ex.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr.h:

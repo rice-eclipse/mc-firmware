@@ -1,7 +1,7 @@
-../Core/Src/freertos.c:120:6:MX_FREERTOS_Init	1
-../Core/Src/freertos.c:173:6:StartCollectionTask	7
-../Core/Src/freertos.c:230:6:StartWebsocketTask	1
-../Core/Src/freertos.c:247:6:HAL_TIM_PeriodElapsedCallback	6
-../Core/Src/freertos.c:283:6:add_datafile_header	6
-../Core/Src/freertos.c:305:13:fn	4
-../Core/Src/freertos.c:321:6:mg_random	3
+../Core/Src/freertos.c:131:6:MX_FREERTOS_Init	1
+../Core/Src/freertos.c:190:6:StartCollectionTask	5
+../Core/Src/freertos.c:237:6:StartProcessingTask	12
+../Core/Src/freertos.c:336:6:startShutdownTask	2
+../Core/Src/freertos.c:374:6:StartCmdHandlingTask	4
+../Core/Src/freertos.c:405:6:HAL_TIM_PeriodElapsedCallback	6
+../Core/Src/freertos.c:440:6:add_datafile_header	6

@@ -27,7 +27,11 @@
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "cJSON.h"
+#include "interface.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,19 +52,37 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+static char TxBuffer[300];
+static char config_str[4000];
+char rx_buffer[52];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 void MX_FREERTOS_Init(void);
+
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int port = 0;
+int sampling_freq_ign = 0;
+int sampling_freq_standby = 0;
+char *console_filename = NULL;
+char cmd_password[MAX_PWD_LENGTH];
+char *data_filename = NULL;
+char *cmd_buffer = NULL;
+char host_ip[MAX_IP_LEN];
+osEventFlagsId_t command_event;
+int sensor_count = MAX_SENSOR_COUNT;
+int driver_count = MAX_DRIVER_COUNT;
+int monitor_count = MAX_MONITOR_COUNT;
+driver driver_list[MAX_DRIVER_COUNT];
+driver ignition;
+monitor monitor_list[MAX_MONITOR_COUNT];
+sensor sensor_list[MAX_SENSOR_COUNT];
 /* USER CODE END 0 */
 
 /**
@@ -96,6 +118,15 @@ int main(void)
   MX_USB_OTG_FS_PCD_Init();
   MX_RNG_Init();
   /* USER CODE BEGIN 2 */
+  /*Mount the sd card to read information from it*/
+  HAL_Delay(1);
+  //mount_sd_interface(&FatFs);
+
+  /*parse the configuration file to get the available sensors and drivers */
+  read_file_interface("config.json", config_str,4000);
+  parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password,
+		  	  	  	  &port, &sampling_freq_ign, &sampling_freq_standby, &driver_count, &sensor_count, &monitor_count);
+
 
   /* USER CODE END 2 */
 

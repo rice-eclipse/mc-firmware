@@ -31,12 +31,15 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
-
+typedef struct{
+	char cmd_buf[32];
+	uint8_t cmd_idx;
+} CMDQUEUE_OBJ_T;
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define MAX_CMD_BACKLOG 5
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -52,6 +55,7 @@ static const char *s_ca_path = "ca.pem";
 static const char *s_cert_path = "cert.pem";
 static const char *s_key_path = "key.pem";
 struct mg_str s_ca, s_cert, s_key;
+uint8_t current_cmd_idx;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -67,6 +71,18 @@ const osThreadAttr_t serverTask_attributes = {
   .stack_size = 2048 * 4,
   .priority = (osPriority_t) osPriorityAboveNormal,
 };
+/* Definitions for cmdHandlingTask */
+osThreadId_t cmdHandlingTaskHandle;
+const osThreadAttr_t cmdHandlingTask_attributes = {
+  .name = "cmdHandlingTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh1,
+};
+/* Definitions for cmdMessageQueue */
+osMessageQueueId_t cmdMessageQueueHandle;
+const osMessageQueueAttr_t cmdMessageQueue_attributes = {
+  .name = "cmdMessageQueue"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -76,6 +92,7 @@ void mg_random(void *buf, size_t len);
 
 void StartDefaultTask(void *argument);
 void StartServerTask(void *argument);
+void StartCmdHandlingTask(void *argument);
 
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -87,7 +104,7 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-
+	current_cmd_idx = 0;
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -102,6 +119,10 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
+  /* Create the queue(s) */
+  /* creation of cmdMessageQueue */
+  cmdMessageQueueHandle = osMessageQueueNew (MAX_CMD_BACKLOG, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
+
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
   /* USER CODE END RTOS_QUEUES */
@@ -112,6 +133,9 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of serverTask */
   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+
+  /* creation of cmdHandlingTask */
+  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -171,6 +195,49 @@ void StartServerTask(void *argument)
   /* USER CODE END StartServerTask */
 }
 
+/* USER CODE BEGIN Header_StartCmdHandlingTask */
+/**
+* @brief Function implementing the cmdHandlingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCmdHandlingTask */
+void StartCmdHandlingTask(void *argument)
+{
+  /* USER CODE BEGIN StartCmdHandlingTask */
+	int ignition_flag;
+	int shutdown_flag;
+	int stop_ignition_flag;
+	int actuation_flag;
+	int driver_id;
+	int direction;
+	CMDQUEUE_OBJ_T cmd;
+  /* Infinite loop */
+  for(;;)
+  {
+	osMessageQueueGet(cmdMessageQueueHandle, &cmd, NULL, osWaitForever);
+	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
+				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
+	/*
+	if (shutdown_flag == 1){
+		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
+	}
+	*/
+	if (stop_ignition_flag == 1){
+		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+	}
+	else if (ignition_flag == 1){
+		//ignition_sequence();
+		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
+	}
+	else if (actuation_flag == 1){
+		HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
+	}
+    osDelay(1);
+  }
+  /* USER CODE END StartCmdHandlingTask */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 static void fn(struct mg_connection *c, int ev, void *ev_data) {
@@ -183,9 +250,19 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
 	  }
   }
   else if (ev == MG_EV_WS_MSG) {
-      // Got websocket frame. Received data is wm->data. Echo it back!
+      // Got websocket frame. Received data is wm->data.
+	  CMDQUEUE_OBJ_T cmd;
       struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
       mg_ws_send(c, wm->data.buf, wm->data.len, WEBSOCKET_OP_TEXT);
+      snprintf(cmd.cmd_buf, sizeof(cmd.cmd_buf),wm->data.buf);
+      cmd.cmd_idx = current_cmd_idx;
+      current_cmd_idx++;
+      if (current_cmd_idx > MAX_CMD_BACKLOG){
+    	  //trigger shutdown condition
+    	  osMessageQueueReset(cmdMessageQueueHandle);
+      }
+      osMessageQueuePut(cmdMessageQueueHandle, &cmd,0U, 0U);
+
   }
 }
 
@@ -197,5 +274,6 @@ void mg_random(void *buf, size_t len) {  // Use on-board RNG
     memcpy((char *) buf + n, &r, n + sizeof(r) > len ? len - n : sizeof(r));
   }
 }
+
 /* USER CODE END Application */
 

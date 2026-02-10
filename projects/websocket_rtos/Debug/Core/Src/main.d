@@ -76,7 +76,8 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
  ../LWIP/Target/ethernetif.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/tcpip.h \
  ../Core/Inc/rng.h ../Core/Inc/main.h ../Core/Inc/usart.h \
- ../Core/Inc/usb_otg.h ../Core/Inc/gpio.h
+ ../Core/Inc/usb_otg.h ../Core/Inc/gpio.h ../Core/Inc/cJSON.h \
+ ../Core/Inc/interface.h
 ../Core/Inc/main.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal.h:
 ../Core/Inc/stm32f2xx_hal_conf.h:
@@ -159,3 +160,5 @@ Core/Src/main.o: ../Core/Src/main.c ../Core/Inc/main.h \
 ../Core/Inc/usart.h:
 ../Core/Inc/usb_otg.h:
 ../Core/Inc/gpio.h:
+../Core/Inc/cJSON.h:
+../Core/Inc/interface.h:

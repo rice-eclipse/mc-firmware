@@ -74,8 +74,8 @@ all: main-build
 main-build: websocket_rtos.elf secondary-outputs
 
 # Tool invocations
-websocket_rtos.elf websocket_rtos.map: $(OBJS) $(USER_OBJS) C:\Users\Deepak\Documents\stm32_drivers\websocket_rtos\STM32F207ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "websocket_rtos.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"C:\Users\Deepak\Documents\stm32_drivers\websocket_rtos\STM32F207ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="websocket_rtos.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+websocket_rtos.elf websocket_rtos.map: $(OBJS) $(USER_OBJS) C:\Users\Deepak\Documents\stm32_drivers\mc-firmware\projects\websocket_rtos\STM32F207ZGTX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "websocket_rtos.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m3 -T"C:\Users\Deepak\Documents\stm32_drivers\mc-firmware\projects\websocket_rtos\STM32F207ZGTX_FLASH.ld" --specs=nosys.specs -Wl,-Map="websocket_rtos.map" -Wl,--gc-sections -static --specs=nano.specs -mfloat-abi=soft -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

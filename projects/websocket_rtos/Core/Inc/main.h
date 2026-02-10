@@ -36,11 +36,55 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 /* USER CODE BEGIN ET */
+typedef struct {
+	char* name;
+	int channel;
+	uint16_t adc_cs;
+	float calibration_slope;
+	float calibration_int;
+} sensor;
+
+typedef struct {
+	GPIO_TypeDef *GPIO_Port;
+	uint16_t GPIO_Pin;
+} driver;
+
+typedef struct{
+	char* name;
+	int channel;
+	uint16_t adc_cs;
+	float calibration_slope;
+	float calibration_int;
+	int sample_rate;
+} monitor;
 
 /* USER CODE END ET */
 
 /* Exported constants --------------------------------------------------------*/
 /* USER CODE BEGIN EC */
+#define MAX_DRIVER_COUNT 6
+#define MAX_SENSOR_COUNT 12
+#define MAX_MONITOR_COUNT 7
+#define MAX_IP_LEN 16
+#define FIR_LENGTH 16
+#define MAX_PWD_LENGTH 15
+
+
+extern sensor sensor_list[MAX_SENSOR_COUNT];
+extern driver driver_list[MAX_DRIVER_COUNT];
+extern monitor monitor_list[MAX_MONITOR_COUNT];
+extern driver ignition;
+extern char host_ip[MAX_IP_LEN];
+extern char cmd_password[MAX_PWD_LENGTH];
+extern int port;
+extern int sampling_freq_ign;
+extern int sampling_freq_standby;
+extern char *cmd_buffer;
+extern char *console_filename;
+extern char *data_filename;
+extern int sensor_count;
+extern int driver_count;
+extern int monitor_count;
 
 /* USER CODE END EC */
 
@@ -59,6 +103,18 @@ void Error_Handler(void);
 /* Private defines -----------------------------------------------------------*/
 #define USER_Btn_Pin GPIO_PIN_13
 #define USER_Btn_GPIO_Port GPIOC
+#define DRV0_Pin GPIO_PIN_0
+#define DRV0_GPIO_Port GPIOF
+#define DRV1_Pin GPIO_PIN_1
+#define DRV1_GPIO_Port GPIOF
+#define DRV2_Pin GPIO_PIN_2
+#define DRV2_GPIO_Port GPIOF
+#define DRV3_Pin GPIO_PIN_3
+#define DRV3_GPIO_Port GPIOF
+#define DRV4_Pin GPIO_PIN_4
+#define DRV4_GPIO_Port GPIOF
+#define IGN_Pin GPIO_PIN_5
+#define IGN_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1

@@ -35,8 +35,6 @@
 #include "cmsis_os.h"
 #include "fatfs.h"
 #include "sdio.h"
-#include "lwip.h"
-#include "mongoose.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -83,15 +81,29 @@ volatile int stop_logging;
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
   .name = "collectionTask",
-  .stack_size = 256 * 4,
+  .stack_size = 128 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
-/* Definitions for websocketTask */
-osThreadId_t websocketTaskHandle;
-const osThreadAttr_t websocketTask_attributes = {
-  .name = "websocketTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityAboveNormal,
+/* Definitions for processingTask */
+osThreadId_t processingTaskHandle;
+const osThreadAttr_t processingTask_attributes = {
+  .name = "processingTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh7,
+};
+/* Definitions for shutdownTask */
+osThreadId_t shutdownTaskHandle;
+const osThreadAttr_t shutdownTask_attributes = {
+  .name = "shutdownTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for cmdHandlingTask */
+osThreadId_t cmdHandlingTaskHandle;
+const osThreadAttr_t cmdHandlingTask_attributes = {
+  .name = "cmdHandlingTask",
+  .stack_size = 128 * 4,
+  .priority = (osPriority_t) osPriorityHigh1,
 };
 /* Definitions for valsToSendMutex */
 osMutexId_t valsToSendMutexHandle;
@@ -102,14 +114,13 @@ const osMutexAttr_t valsToSendMutex_attributes = {
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 void add_datafile_header();
-static void fn(struct mg_connection *c, int ev, void *ev_data);
-void mg_random(void *buf, size_t len);
 /* USER CODE END FunctionPrototypes */
 
 void StartCollectionTask(void *argument);
-void StartWebsocketTask(void *argument);
+void StartProcessingTask(void *argument);
+void startShutdownTask(void *argument);
+void StartCmdHandlingTask(void *argument);
 
-extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
 /**
@@ -148,8 +159,14 @@ void MX_FREERTOS_Init(void) {
   /* creation of collectionTask */
   collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
 
-  /* creation of websocketTask */
-  websocketTaskHandle = osThreadNew(StartWebsocketTask, NULL, &websocketTask_attributes);
+  /* creation of processingTask */
+  processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
+
+  /* creation of shutdownTask */
+  shutdownTaskHandle = osThreadNew(startShutdownTask, NULL, &shutdownTask_attributes);
+
+  /* creation of cmdHandlingTask */
+  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -172,25 +189,15 @@ void MX_FREERTOS_Init(void) {
 /* USER CODE END Header_StartCollectionTask */
 void StartCollectionTask(void *argument)
 {
-  /* init code for LWIP */
-  MX_LWIP_Init();
   /* USER CODE BEGIN StartCollectionTask */
-
-  extern struct netif gnetif;
-    while(ip4_addr_isany_val(*netif_ip4_addr(&gnetif)))
-   	  osDelay(200); // CMSIS-RTOS v1 uses milliseconds
-     MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
-     websocketTaskHandle = osThreadNew(StartWebsocketTask, NULL, &websocketTask_attributes);
-     osThreadTerminate(collectionTaskHandle);
 	//used to determine which of the buffers have been filled when copying to the 'vals_to_send' buffer
 	 float *curr_buffer;
-	 //HAL_TIM_Base_Start_IT(&htim14);
-	 //HAL_TIM_Base_Start_IT(&htim13);
-	 //HAL_TIM_Base_Start_IT(&htim11);
+	 HAL_TIM_Base_Start_IT(&htim14);
+	 HAL_TIM_Base_Start_IT(&htim13);
+	 HAL_TIM_Base_Start_IT(&htim11);
 	int sample_count = 0;
 	uint32_t sending_flag;
 	osStatus_t mutex_status;
-
   /* Infinite loop */
   for(;;)
   {
@@ -200,11 +207,11 @@ void StartCollectionTask(void *argument)
 
 	 //First Buffer has been filled
 	 if (sample_count == sensor_count){
-		 //osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+		 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
 		 curr_buffer = &sensor_vals[0];
 	 }
 	 else if (sample_count == 0){
-		 //osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+		 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 		 curr_buffer = &sensor_vals[sensor_count];
 	 }
 	 //check if it is time to send the data to mission control
@@ -220,26 +227,177 @@ void StartCollectionTask(void *argument)
   /* USER CODE END StartCollectionTask */
 }
 
-/* USER CODE BEGIN Header_StartWebsocketTask */
+/* USER CODE BEGIN Header_StartProcessingTask */
 /**
-* @brief Function implementing the websocketTask thread.
+* @brief Function implementing the processingTask thread.
 * @param argument: Not used
 * @retval None
 */
-/* USER CODE END Header_StartWebsocketTask */
-void StartWebsocketTask(void *argument)
+/* USER CODE END Header_StartProcessingTask */
+void StartProcessingTask(void *argument)
 {
-  /* USER CODE BEGIN StartWebsocketTask */
-	struct mg_mgr mgr;
-		  mg_mgr_init(&mgr);
-		  mg_http_listen(&mgr, "http://192.168.0.121:8000", fn, NULL);
+  /* USER CODE BEGIN StartProcessingTask */
+	uint32_t processing_flag;
+	int sd_card_pos = 0;
+	int log_count = 0;
+	float *current_buffer;
+	open_file_interface(&data_file, "data.csv");
+	add_datafile_header();
+	open_file_interface(&log_file, "console.log");
+	/*We sync the file to the sd card every second*/
+	int sync_count = 0;
+#ifndef TEST_LOGIC
+	FRESULT fres;
+#endif
   /* Infinite loop */
   for(;;)
   {
-	  mg_mgr_poll(&mgr, 10);
+	  processing_flag = osThreadFlagsWait((FIRST_BUF_READY | SECOND_BUF_READY),
+			  	  	  	  	  	  	  	  osFlagsWaitAny, osWaitForever);
+	  //set the current buf pointer to the first part of the data buffer
+	  if (processing_flag & FIRST_BUF_READY){
+		  current_buffer = &sensor_vals[0];
+	  }
+	  else if (processing_flag & SECOND_BUF_READY){
+		  current_buffer = &sensor_vals[sensor_count];
+	  }
+
+	  if (stop_logging == 0){
+		  //performs the filtering and decimation of the data
+		  filter_and_decimate_interface(current_buffer, sensor_count);
+		  sdcard_data[0] = '\0';
+		  //writes the data to SD card
+		  for (int i = 0; i < sensor_count; i++){
+
+			  sprintf(tx_buffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
+																	   current_buffer[i]);
+			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+
+			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f,",current_buffer[i]);
+			  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
+				  sprintf(tx_buffer, "buffer full!\r\n");
+				  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+				  //drop the data in this cycle
+				  sd_card_pos = 0;
+				  break;
+			  }
+		  }
+
+		  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "\r\n");
+		  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
+				  sprintf(tx_buffer, "buffer full!\r\n");
+				  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+				  //drop the data in this cycle
+				  sd_card_pos = 0;
+			  }
+		  log_count++;
+		  if (log_count == 20){
+			  sprintf(tx_buffer, "sd write\r\n");
+			  sprintf(logging_str,"sd write\r\n");
+			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+			  log_count = 0;
+
+#ifndef TEST_LOGIC
+			  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
+			  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
+#endif
+			  sd_card_pos = 0;
+			  memset(sdcard_data, 0, sizeof(sdcard_data));
+		  }
+		  /*TODO: include timestamps from RTC*/
+		  sync_count = (sync_count + 1) % sampling_freq_ign;
+		  if (sync_count == 0){
+			  sprintf(tx_buffer, "synced data\r\n");
+			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+		  }
+#ifndef TEST_LOGIC
+		  /*sync data to SD card every second*/
+		  if (sync_count == 0){
+			  f_sync(&data_file);
+			  f_sync(&log_file);
+		  }
+	#endif
+	  }
+	  else{
+		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
+	  }
+	  osDelay(1);
+  }
+  /* USER CODE END StartProcessingTask */
+}
+
+/* USER CODE BEGIN Header_startShutdownTask */
+/**
+* @brief stops logging & processing, and closes all the files when a shutdown condition is met
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_startShutdownTask */
+void startShutdownTask(void *argument)
+{
+  /* USER CODE BEGIN startShutdownTask */
+	uint32_t shutdown_flag;
+  /* Infinite loop */
+  for(;;)
+  {
+	shutdown_flag = osThreadFlagsWait(SHUTDOWN, osFlagsWaitAny, osWaitForever);
+	/*Tell processing task to stop*/
+	stop_logging = 1;
+
+	/*Waits for processing to stop*/
+	shutdown_flag = osThreadFlagsWait(LOGGING_STOPPED, osFlagsWaitAny, osWaitForever);
+
+	close_file_interface(&data_file);
+	close_file_interface(&log_file);
+	unmount_sd_interface();
+	if (collectionTaskHandle != NULL){
+		osThreadTerminate(collectionTaskHandle);
+	}
+	if (processingTaskHandle != NULL){
+		osThreadTerminate(processingTaskHandle);
+	}
+	sprintf(tx_buffer, "All tasks closed\r\n");
+	HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), HAL_MAX_DELAY);
+	osThreadExit();
     osDelay(1);
   }
-  /* USER CODE END StartWebsocketTask */
+  /* USER CODE END startShutdownTask */
+}
+
+/* USER CODE BEGIN Header_StartCmdHandlingTask */
+/**
+* @brief Function implementing the cmdHandlingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCmdHandlingTask */
+void StartCmdHandlingTask(void *argument)
+{
+  /* USER CODE BEGIN StartCmdHandlingTask */
+	uint32_t msg_received_flag;
+	int ignition_flag;
+	int shutdown_flag;
+	int stop_ignition_flag;
+	int driver_id;
+	int direction;
+  /* Infinite loop */
+  for(;;)
+  {
+	msg_received_flag = osThreadFlagsWait(MSG_RECEIVED, osFlagsWaitAny, osWaitForever);
+	parse_command_interface(cmd_str, &driver_id, &direction, driver_list, &ignition_flag,
+			  	  	  	  	  	&shutdown_flag, &stop_ignition_flag);
+	if (shutdown_flag == 1){
+		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
+	}
+	else if (stop_ignition_flag == 1){
+		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+	}
+	else if (ignition_flag == 1){
+		ignition_sequence();
+	}
+    osDelay(1);
+  }
+  /* USER CODE END StartCmdHandlingTask */
 }
 
 /* Private application code --------------------------------------------------*/
@@ -268,8 +426,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM13){
 	  /*shutdown condition has occured*/
 	  if (tim13_tick_count == 1){
-		  //osThreadFlagsSet(shutdownTaskHandle,SHUTDOWN);
-		  HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		  osThreadFlagsSet(shutdownTaskHandle,SHUTDOWN);
 	  }
 	  else{
 		  tim13_tick_count = 1;
@@ -302,30 +459,6 @@ void add_datafile_header(){
 #endif
 }
 
-static void fn(struct mg_connection *c, int ev, void *ev_data) {
-  if (ev == MG_EV_HTTP_MSG){
-	  struct mg_http_message *hm = (struct mg_http_message *) ev_data;
-	  if (mg_match(hm->uri, mg_str("/websocket"), NULL)) {
-		// Upgrade to websocket. From now on, a connection is a full-duplex
-		// Websocket connection, which will receive MG_EV_WS_MSG events.
-		mg_ws_upgrade(c, hm, NULL);
-	  }
-  }
-  else if (ev == MG_EV_WS_MSG) {
-      // Got websocket frame. Received data is wm->data. Echo it back!
-      struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-      mg_ws_send(c, wm->data.buf, wm->data.len, WEBSOCKET_OP_TEXT);
-  }
-}
-
-void mg_random(void *buf, size_t len) {  // Use on-board RNG
-  extern RNG_HandleTypeDef hrng;
-  for (size_t n = 0; n < len; n += sizeof(uint32_t)) {
-    uint32_t r;
-    HAL_RNG_GenerateRandomNumber(&hrng, &r);
-    memcpy((char *) buf + n, &r, n + sizeof(r) > len ? len - n : sizeof(r));
-  }
-}
 
 /* USER CODE END Application */
 

@@ -42,6 +42,10 @@ typedef struct{
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
 #define MAX_CMD_BACKLOG 5
+#define FIRST_BUF_READY (1 << 0)
+#define SECOND_BUF_READY (1 << 1)
+#define SAMPLE_NOW (1 << 2)
+#define SEND_NOW (1 << 7)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -59,6 +63,16 @@ static const char *s_key_path = "key.pem";
 struct mg_str s_ca, s_cert, s_key;
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
+
+static char sensor_data_str[4000];
+//Ping-pong buffer for data to write to sd
+float sensor_vals[2*MAX_SENSOR_COUNT];
+
+//the snapshot of sensor vals to send to mission control
+//pointer to the 'last filled buffer'
+float *filled_buffer;
+float vals_to_send[MAX_SENSOR_COUNT];
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -81,6 +95,13 @@ const osThreadAttr_t cmdHandlingTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
 };
+/* Definitions for collectionTask */
+osThreadId_t collectionTaskHandle;
+const osThreadAttr_t collectionTask_attributes = {
+  .name = "collectionTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityRealtime,
+};
 /* Definitions for cmdMessageQueue */
 osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
@@ -96,6 +117,7 @@ void mg_random(void *buf, size_t len);
 void StartDefaultTask(void *argument);
 void StartServerTask(void *argument);
 void StartCmdHandlingTask(void *argument);
+void StartCollectionTask(void *argument);
 
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -124,7 +146,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of cmdMessageQueue */
-  cmdMessageQueueHandle = osMessageQueueNew (MAX_CMD_BACKLOG, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
+  cmdMessageQueueHandle = osMessageQueueNew (256, sizeof(char), &cmdMessageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -134,11 +156,11 @@ void MX_FREERTOS_Init(void) {
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
-  /* creation of serverTask */
-  serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
-
   /* creation of cmdHandlingTask */
-  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+
+
+  /* creation of collectionTask */
+
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -164,10 +186,17 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN StartDefaultTask */
   extern struct netif gnetif;
   while(ip4_addr_isany_val(*netif_ip4_addr(&gnetif)))
- 	  osDelay(200); // CMSIS-RTOS v1 uses milliseconds
+ 	  osDelay(200);
    MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
-   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
-   osThreadTerminate(defaultTaskHandle);
+
+   /*Start the timers and the rest of the tasks*/
+   collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
+  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+  serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+   HAL_TIM_Base_Start_IT(&htim14);
+   HAL_TIM_Base_Start_IT(&htim13);
+
+   osThreadExit();
   /* Infinite loop */
   for(;;)
   {
@@ -186,13 +215,26 @@ void StartDefaultTask(void *argument)
 void StartServerTask(void *argument)
 {
   /* USER CODE BEGIN StartServerTask */
+	uint32_t sending_flag;
 	 struct mg_mgr mgr;
 	  mg_mgr_init(&mgr);
 	  mg_http_listen(&mgr, "http://192.168.0.121:8000", fn, NULL);  // Create HTTP listener
   /* Infinite loop */
   for(;;)
   {
-	  mg_mgr_poll(&mgr, 1000);
+	  mg_mgr_poll(&mgr, 10);
+	  //package the data in json for the websocket and send at each sending interval
+	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
+	  if (sending_flag & SEND_NOW){
+		  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
+		  sensor_message_interface(sensor_data_str, vals_to_send_local);
+		  for (struct mg_connection *client = mgr->conns; client != NULL; client = client->next){
+			  if (client->data[0] == 'W'){
+				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+			  }
+		  }
+
+	  }
     osDelay(1);
   }
   /* USER CODE END StartServerTask */
@@ -245,6 +287,41 @@ void StartCmdHandlingTask(void *argument)
   /* USER CODE END StartCmdHandlingTask */
 }
 
+/* USER CODE BEGIN Header_StartCollectionTask */
+/**
+* @brief Function implementing the collectionTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCollectionTask */
+void StartCollectionTask(void *argument)
+{
+  /* USER CODE BEGIN StartCollectionTask */
+	int sample_count;
+
+  /* Infinite loop */
+  for(;;)
+  {
+	   osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
+		 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
+		 sample_count = (sample_count + 1) % (sensor_count*2);
+
+		 //First Buffer has been filled
+		 if (sample_count == sensor_count){
+			 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+			 filled_buffer = &sensor_vals[0];
+		 }
+		 //second buffer filled
+		 else if (sample_count == 0){
+			 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+			 filled_buffer = &sensor_vals[sensor_count];
+		 }
+
+    osDelay(1);
+  }
+  /* USER CODE END StartCollectionTask */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 static void fn(struct mg_connection *c, int ev, void *ev_data) {
@@ -254,6 +331,8 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
 		// Upgrade to websocket. From now on, a connection is a full-duplex
 		// Websocket connection, which will receive MG_EV_WS_MSG events.
 		mg_ws_upgrade(c, hm, NULL);
+		//mark connection
+		c->data[0] = 'W';
 	  }
   }
   else if (ev == MG_EV_WS_MSG) {
@@ -271,6 +350,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
       osMessageQueuePut(cmdMessageQueueHandle, &cmd,0U, 0U);
 
   }
+
 }
 
 void mg_random(void *buf, size_t len) {  // Use on-board RNG
@@ -281,6 +361,32 @@ void mg_random(void *buf, size_t len) {  // Use on-board RNG
     memcpy((char *) buf + n, &r, n + sizeof(r) > len ? len - n : sizeof(r));
   }
 }
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM7 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
 
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM7)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+  if (htim->Instance == TIM14){
+	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
+  }
+  if (htim->Instance == TIM13){
+	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
+  }
+
+  /* USER CODE END Callback 1 */
+}
 /* USER CODE END Application */
 

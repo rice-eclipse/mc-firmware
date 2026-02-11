@@ -332,6 +332,10 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	cJSON *dir = NULL;
 	cJSON *password = NULL;
 	int status = 0;
+	*actuation_flag = 0;
+	*ignition_flag = 0;
+	*shutdown_flag = 0;
+	*cancel_ignition_flag = 0;
 
 	cJSON *cmd = cJSON_Parse(json_string);
 	if (cmd == NULL) {
@@ -348,7 +352,6 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	if (strcmp(password->valuestring, "quonk") != 0){
 		sprintf(TxBuffer, "Incorrect Password\r\n");
 		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-		*actuation_flag = 0;
 		status = 1;
 		goto end;
 	}
@@ -374,6 +377,15 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 			goto end;
 		}
 
+	}
+	else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring,"Ignition") == 0){
+		*ignition_flag = 1;
+	}
+	else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring,"EmergencyStop") == 0){
+		*shutdown_flag = 1;
+	}
+	else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "CancelIgnition") == 0){
+		*cancel_ignition_flag = 1;
 	}
 	end:
 		cJSON_Delete(cmd);

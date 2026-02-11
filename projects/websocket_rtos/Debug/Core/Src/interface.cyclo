@@ -2,4 +2,4 @@
 ../Core/Src/interface.c:237:5:read_file_interface	2
 ../Core/Src/interface.c:319:7:get_sensorval_interface	1
 ../Core/Src/interface.c:324:6:filter_and_decimate_interface	1
-../Core/Src/interface.c:327:5:parse_command_interface	8
+../Core/Src/interface.c:327:5:parse_command_interface	14

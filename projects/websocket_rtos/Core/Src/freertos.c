@@ -29,6 +29,7 @@
 #include "lwip.h"
 #include "interface.h"
 #include "usart.h"
+#include "tim.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -67,12 +68,12 @@ static char TxBuffer[300];
 static char sensor_data_str[4000];
 //Ping-pong buffer for data to write to sd
 float sensor_vals[2*MAX_SENSOR_COUNT];
-
+int driver_states[MAX_DRIVER_COUNT];
 //the snapshot of sensor vals to send to mission control
 //pointer to the 'last filled buffer'
 float *filled_buffer;
 float vals_to_send[MAX_SENSOR_COUNT];
-
+int driver_states_to_send[MAX_DRIVER_COUNT];
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -130,6 +131,9 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 	current_cmd_idx = 0;
+	for (int i = 0; i < driver_count; i++){
+		driver_states[i] = 0;
+	}
   /* USER CODE END Init */
 
   /* USER CODE BEGIN RTOS_MUTEX */
@@ -227,8 +231,9 @@ void StartServerTask(void *argument)
 	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 	  if (sending_flag & SEND_NOW){
 		  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
-		  sensor_message_interface(sensor_data_str, vals_to_send_local);
-		  for (struct mg_connection *client = mgr->conns; client != NULL; client = client->next){
+		  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
+		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
+		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 			  if (client->data[0] == 'W'){
 				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 			  }
@@ -281,6 +286,8 @@ void StartCmdHandlingTask(void *argument)
 		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 
+		//TODO: use driver current monitors to verify this
+		driver_states[driver_id] = (direction == 1) ? 1 : 0;
 	}
     osDelay(1);
   }
@@ -297,7 +304,7 @@ void StartCmdHandlingTask(void *argument)
 void StartCollectionTask(void *argument)
 {
   /* USER CODE BEGIN StartCollectionTask */
-	int sample_count;
+	int sample_count = 0;
 
   /* Infinite loop */
   for(;;)
@@ -308,12 +315,12 @@ void StartCollectionTask(void *argument)
 
 		 //First Buffer has been filled
 		 if (sample_count == sensor_count){
-			 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+			 //osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
 			 filled_buffer = &sensor_vals[0];
 		 }
 		 //second buffer filled
 		 else if (sample_count == 0){
-			 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+			 //osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 			 filled_buffer = &sensor_vals[sensor_count];
 		 }
 

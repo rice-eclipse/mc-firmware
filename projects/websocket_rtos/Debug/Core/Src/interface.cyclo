@@ -3,3 +3,4 @@
 ../Core/Src/interface.c:319:7:get_sensorval_interface	1
 ../Core/Src/interface.c:324:6:filter_and_decimate_interface	1
 ../Core/Src/interface.c:327:5:parse_command_interface	14
+../Core/Src/interface.c:396:6:sensor_message_interface	9

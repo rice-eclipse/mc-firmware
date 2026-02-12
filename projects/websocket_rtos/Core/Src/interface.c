@@ -392,3 +392,60 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 		return status;
 	}
 
+/*Creates the json string to send over the websocket*/
+void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states){
+	int json_len = 0;
+	json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "{");
+
+	// inserts first part of each sensor json file
+	const char *sensor_types[] = {"tcs", "pts", "lcs"};
+	const char groups[] = {'t', 'p', 'l'};
+
+	for (int i = 0; i < 3; i++) {
+	    json_len += snprintf(json_buf + json_len, json_buf_size - json_len,
+	            "\"%s\":{\"type\":\"SensorValue\",\"group_id\":%d,\"readings\":[",
+	            sensor_types[i], i);
+	    // inserts each sensor
+	    int first_in_group = 1;  // Track if this is the first sensor in the group
+	    for (int j = 0; j < sensor_count; j++) {
+	        if (sensor_list[j].name[0] == groups[i]) {
+	            // inserts comma only after first sensor in each sensor group
+	            if (first_in_group) {
+	                json_len += snprintf(json_buf + json_len, json_buf_size - json_len,
+	                        "{\"sensor_id\":%d,\"reading\":%d}",
+	                        sensor_list[j].channel, (int)(sensor_vals[j] * 1000));
+	                first_in_group = 0;
+	            }
+	            else {
+	                json_len += snprintf(json_buf + json_len, json_buf_size - json_len,
+	                        ",{\"sensor_id\":%d,\"reading\":%d}",
+	                        sensor_list[j].channel, (int)(sensor_vals[j] * 1000));
+	            }
+	        }
+	    }
+	    // Add closing bracket for readings array and closing brace for sensor group
+	    if (i < 2) {
+	        json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "]},");
+	    } else {
+	        json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "]},");
+	    }
+	}
+
+	// inserts drivers
+	json_len += snprintf(json_buf + json_len, json_buf_size - json_len,
+	        "\"driver\":{\"type\":\"DriverValue\",\"values\":[");
+	for (int i = 0; i < driver_count; i++) {
+	    if (i == driver_count - 1) {
+	        json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "%d", driver_states[i]);
+	    }
+	    else {
+	        json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "%d,", driver_states[i]);
+	    }
+	}
+	json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "]}}");
+	if (json_len >= json_buf_size) {
+	    sprintf(TxBuffer, "Buffer Overflow!\r\n");
+	    HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), 100);
+	}
+}
+

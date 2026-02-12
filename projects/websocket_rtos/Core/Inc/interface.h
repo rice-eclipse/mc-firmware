@@ -17,4 +17,5 @@ float get_sensorval_interface(sensor *current_sensor);
 int parse_command_interface(const char* json_string, int* driver_id, int* direction, driver *driver_list, int *ignition_flag,
   	  	  	int *shutdown_flag, int *cancel_ignition_flag, int *actuation_flag);
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count);
+void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states);
 #endif /* INC_INTERFACE_H_ */

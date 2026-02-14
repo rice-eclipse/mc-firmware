@@ -9,6 +9,7 @@
 #define INC_INTERFACE_H_
 
 #include "main.h"
+#include "spi.h"
 int parse_config_interface(const char *config_str, driver *driver_list,sensor *sensor_list,monitor *monitor_list, driver *ignition,
 				 char *host_ip,char *password, int *port,int *sampling_freq_ign,int *sampling_freq_standby,
 				 int *driver_count, int *sensor_count, int *monitor_count);
@@ -18,4 +19,5 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
   	  	  	int *shutdown_flag, int *cancel_ignition_flag, int *actuation_flag);
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count);
 void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states);
+uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
 #endif /* INC_INTERFACE_H_ */

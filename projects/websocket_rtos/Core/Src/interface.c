@@ -237,40 +237,66 @@ int parse_config_interface(const char *config_str, driver *driver_list,sensor *s
 int read_file_interface(const char *filename, char *data_buffer, size_t buffer_size){
 
 	const char *config_str2 =
-	"{"
-	"\"host\": {\"ip\": \"127.0.0.1\"},"
-	"\"password\": \"quonk\","
-	"\"port\": 1234,"
-	"\"sampling_freq_ignition\": 5000,"
-	"\"sampling_freq_standby\": 1,"
-	"\"drivers\": ["
-	"  {"
-	"    \"driver\": \"D1: Ox Fill\","
-	"    \"gpio_pin\": 0,"
-	"    \"gpio_port\": \"GPIOB\","
-	"    \"channel\": 2,"
-	"    \"adc_cs\": 2,"
-	"    \"enabled\": \"true\""
-	"  },"
-	"  {"
-	"    \"driver\": \"D2: Ground Vent\","
-	"    \"gpio_pin\": 1,"
-	"    \"gpio_port\": \"GPIOB\","
-	"    \"calibration_intercept\": 32,"
-	"    \"channel\": 1,"
-	"    \"adc_cs\": 2,"
-	"    \"enabled\": \"true\""
-	"  },"
-	"  {"
-	"    \"driver\": \"D3: Engine Vent\","
-	"    \"gpio_pin\": 2,"
-	"    \"gpio_port\": \"GPIOC\","
-	"    \"channel\": 3,"
-	"    \"adc_cs\": 2,"
-	"    \"enabled\": \"true\""
-	"  }"
-	"]"
-	"}";
+	    "{"
+	    "\"host\": {\"ip\": \"127.0.0.1\"},"
+	    "\"password\":\"quonk\","
+	    "\"port\": 1234,"
+	    "\"sampling_freq_ignition\": 5000,"
+	    "\"sampling_freq_standby\": 1,"
+	    "\"sensors\": ["
+	    "  {"
+	    "    \"sensor\": \"tc1:ox_tank\","
+	    "    \"channel\": 2,"
+	    "    \"adc_cs\": 1,"
+	    "    \"calibration_intercept\": 32,"
+	    "    \"calibration_slope\": 1.8,"
+	    "    \"enabled\": \"true\""
+	    "  },"
+	    "  {"
+	    "    \"sensor\": \"tc2:combustion_chamber\","
+	    "    \"channel\": 3,"
+	    "    \"adc_cs\": 1,"
+	    "    \"calibration_intercept\": 32,"
+	    "    \"calibration_slope\": 1.8,"
+	    "    \"enabled\": \"true\""
+	    "  },"
+	    "  {"
+	    "    \"sensor\": \"pt1:combustion_chamber\","
+	    "    \"channel\": 6,"
+	    "    \"adc_cs\": 2,"
+	    "    \"calibration_intercept\": 0.4664,"
+	    "    \"calibration_slope\": 0.0019,"
+	    "    \"enabled\": \"true\""
+	    "  }"
+	    "],"
+	    "\"drivers\": ["
+	    "  {"
+	    "    \"driver\": \"D1: Ox Fill\","
+	    "    \"gpio_pin\": 0,"
+	    "    \"gpio_port\": \"GPIOB\","
+	    "    \"channel\": 2,"
+	    "    \"adc_cs\": 2,"
+	    "    \"enabled\": \"true\""
+	    "  },"
+	    "  {"
+	    "    \"driver\": \"D2: Ground Vent\","
+	    "    \"gpio_pin\": 1,"
+	    "    \"gpio_port\": \"GPIOB\","
+	    "    \"calibration_intercept\": 32,"
+	    "    \"channel\": 1,"
+	    "    \"adc_cs\": 2,"
+	    "    \"enabled\": \"true\""
+	    "  },"
+	    "  {"
+	    "    \"driver\": \"D3: Engine Vent\","
+	    "    \"gpio_pin\": 2,"
+	    "    \"gpio_port\": \"GPIOC\","
+	    "    \"channel\": 3,"
+	    "    \"adc_cs\": 2,"
+	    "    \"enabled\": \"true\""
+	    "  }"
+	    "]"
+	    "}";
 
 
 
@@ -317,9 +343,29 @@ int mount_sd_interface(FATFS* FatFs){
 }
 */
 float get_sensorval_interface(sensor *current_sensor){
-	uint16_t adc_val =0;
-	static float sensor_val = 0;
+	uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
+	float voltage = (adc_val)*4.096/4096;
+	float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
 	return sensor_val;
+}
+uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle){
+	uint8_t tx[3];
+	uint8_t rx[3];
+
+	//start + single-ended + D2
+	tx[0] = 0x06 | ((channel & 0x04) >> 2);
+	//D1 + D0 shifted to B7 and B6
+	tx[1] = (channel & 0x03) << 6;
+	//don't care
+	tx[2] = 0x00;
+
+	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_RESET);
+	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
+
+	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
+
+	return dataBuff;
 }
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count){
 	return;
@@ -396,7 +442,6 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states){
 	int json_len = 0;
 	json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "{");
-
 	// inserts first part of each sensor json file
 	const char *sensor_types[] = {"tcs", "pts", "lcs"};
 	const char groups[] = {'t', 'p', 'l'};

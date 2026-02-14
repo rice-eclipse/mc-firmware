@@ -160,11 +160,14 @@ void MX_FREERTOS_Init(void) {
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
-  /* creation of cmdHandlingTask */
+  /* creation of serverTask */
+  serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
 
+  /* creation of cmdHandlingTask */
+  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
   /* creation of collectionTask */
-
+  collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */

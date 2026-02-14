@@ -1,8 +1,8 @@
 ../Core/Src/freertos.c:131:6:MX_FREERTOS_Init	16	static
-../Core/Src/freertos.c:186:6:StartDefaultTask	16	static
-../Core/Src/freertos.c:219:6:StartServerTask	96	static
-../Core/Src/freertos.c:255:6:StartCmdHandlingTask	264	static
-../Core/Src/freertos.c:304:6:StartCollectionTask	24	static
-../Core/Src/freertos.c:334:13:fn	256	static
-../Core/Src/freertos.c:363:6:mg_random	24	static
-../Core/Src/freertos.c:379:6:HAL_TIM_PeriodElapsedCallback	16	static
+../Core/Src/freertos.c:189:6:StartDefaultTask	16	static
+../Core/Src/freertos.c:222:6:StartServerTask	96	static
+../Core/Src/freertos.c:258:6:StartCmdHandlingTask	264	static
+../Core/Src/freertos.c:307:6:StartCollectionTask	24	static
+../Core/Src/freertos.c:337:13:fn	256	static
+../Core/Src/freertos.c:366:6:mg_random	24	static
+../Core/Src/freertos.c:382:6:HAL_TIM_PeriodElapsedCallback	16	static

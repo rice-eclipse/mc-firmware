@@ -21,6 +21,7 @@
 #include "cmsis_os.h"
 #include "lwip.h"
 #include "rng.h"
+#include "spi.h"
 #include "tim.h"
 #include "usart.h"
 #include "usb_otg.h"
@@ -119,6 +120,7 @@ int main(void)
   MX_RNG_Init();
   MX_TIM13_Init();
   MX_TIM14_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
@@ -196,7 +198,6 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
 
 
 /**

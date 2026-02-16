@@ -19,12 +19,12 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "spi.h"
-#include "usb_otg.h"
+#include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-
+#include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -45,13 +45,14 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-
+uint8_t txBuffer[200];
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
-
+uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
+float get_sensorval(int channel, uint16_t adc_cs);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -89,7 +90,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
-  MX_USB_OTG_FS_PCD_Init();
+  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
 
   /* USER CODE END 2 */
@@ -102,6 +103,8 @@ int main(void)
 	 HAL_Delay(500);
 	 HAL_GPIO_WritePin(HBT_GPIO_Port, HBT_Pin, GPIO_PIN_RESET);
 	 HAL_Delay(500);
+	 float lc_voltage = get_sensorval(0, SPI2_CS_Pin);
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -155,7 +158,32 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
+uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle){
+	uint8_t tx[3];
+	uint8_t rx[3];
 
+	//start + single-ended + D2
+	tx[0] = 0x06 | ((channel & 0x04) >> 2);
+	//D1 + D0 shifted to B7 and B6
+	tx[1] = (channel & 0x03) << 6;
+	//don't care
+	tx[2] = 0x00;
+
+	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_RESET);
+	HAL_Delay(1);
+	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
+
+	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
+	CDC_Transmit_FS(txBuffer, sprintf((char *)txBuffer, "%d\r\n",dataBuff));
+	return dataBuff;
+}
+float get_sensorval(int channel, uint16_t adc_cs){
+	uint16_t adc_val = get_mcp3208_adcval(channel, adc_cs, &hspi2);
+	float voltage = (adc_val)*4.096/4096;
+	//float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
+	return voltage;
+}
 /* USER CODE END 4 */
 
 /**

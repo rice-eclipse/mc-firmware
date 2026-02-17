@@ -18,6 +18,8 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "fatfs.h"
+#include "sdio.h"
 #include "spi.h"
 #include "usb_device.h"
 #include "gpio.h"
@@ -46,6 +48,15 @@
 
 /* USER CODE BEGIN PV */
 uint8_t txBuffer[200];
+uint8_t TxBuffer[300];
+char RW_Buffer[200];
+static char config_str[4000];
+UINT WWC;
+FATFS FatFs;
+FIL Fil;
+FRESULT fres;
+FIL config_file;
+int counter;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -53,6 +64,7 @@ void SystemClock_Config(void);
 /* USER CODE BEGIN PFP */
 uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
 float get_sensorval(int channel, uint16_t adc_cs);
+int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -68,7 +80,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-
+	counter = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -77,7 +89,6 @@ int main(void)
   HAL_Init();
 
   /* USER CODE BEGIN Init */
-
   /* USER CODE END Init */
 
   /* Configure the system clock */
@@ -91,20 +102,46 @@ int main(void)
   MX_GPIO_Init();
   MX_SPI2_Init();
   MX_USB_DEVICE_Init();
+  MX_SDIO_SD_Init();
+  MX_FATFS_Init();
   /* USER CODE BEGIN 2 */
+  fres = (f_mount(&FatFs, "", 1));
+  	if (fres != FR_OK){
+  		sprintf((char *)txBuffer, "f_mount error (%i)\r\n", fres);
+  		CDC_Transmit_FS(txBuffer,strlen((char *)txBuffer));
+  	}else{
+  		sprintf((char *)txBuffer, "SD Card Mounted Successfully! \r\n\n");
+  		CDC_Transmit_FS(txBuffer, strlen((char *)txBuffer));
+  	}
+  	fres = f_open(&Fil, "MyTextFile.txt", FA_WRITE | FA_READ | FA_CREATE_ALWAYS);
+  	    if(fres != FR_OK)
+  	    {
+  	      sprintf((char *)txBuffer, "Error! While Creating/Opening A New Text File, Error Code: (%i)\r\n", fres);
+  	      CDC_Transmit_FS(txBuffer, strlen((char *)txBuffer));
 
+  	    } else{
+  	    	strcpy(RW_Buffer, "Hello! From STM32 To SD Card Over SDIO, Using f_write()\r\n");
+  	    	 f_write(&Fil, RW_Buffer, strlen(RW_Buffer), &WWC);
+  	    }
+  	    f_close(&Fil);
+  	    read_file(&config_file, "config.json", config_str, 4000);
   /* USER CODE END 2 */
 
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
   {
+	  /*
 	 HAL_GPIO_WritePin(HBT_GPIO_Port, HBT_Pin, GPIO_PIN_SET);
 	 HAL_Delay(500);
 	 HAL_GPIO_WritePin(HBT_GPIO_Port, HBT_Pin, GPIO_PIN_RESET);
 	 HAL_Delay(500);
-	 float lc_voltage = get_sensorval(0, SPI2_CS_Pin);
-
+	 */
+	 float lc_voltage = get_sensorval(1, SPI2_CS_Pin);
+	 if (counter == 0)
+		 CDC_Transmit_FS(txBuffer, sprintf((char *)txBuffer, "%f\r\n",lc_voltage));
+	 HAL_Delay(1);
+	 counter = (counter+1)%400;
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
@@ -169,13 +206,12 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	//don't care
 	tx[2] = 0x00;
 
-	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_RESET);
-	HAL_Delay(1);
+	HAL_GPIO_WritePin(GPIOE, cs, GPIO_PIN_RESET);
 	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOE, cs, GPIO_PIN_SET);
 
 	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
-	CDC_Transmit_FS(txBuffer, sprintf((char *)txBuffer, "%d\r\n",dataBuff));
+
 	return dataBuff;
 }
 float get_sensorval(int channel, uint16_t adc_cs){
@@ -184,6 +220,42 @@ float get_sensorval(int channel, uint16_t adc_cs){
 	//float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
 	return voltage;
 }
+
+int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size)
+{
+
+	FRESULT fres;
+	fres = f_open(target_file, filename, FA_READ);
+	   if(fres != FR_OK) {
+		sprintf((char *)TxBuffer,"f_open error (%i)\r\n", fres);
+		CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
+		return -2;
+	   }
+
+	   //get the number of characters to allocate to this string
+	   long size = f_size(target_file);
+	   if (size > buffer_size){
+		   sprintf((char *)TxBuffer, "Error: Input buffer size too small \r\n");
+		   CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
+		   f_close(target_file);
+		   return -2;
+	   }
+	   UINT br = 0;
+	   FRESULT rres = f_read(target_file,(void *)data_buffer,size, &br);
+	   if(rres != FR_OK) {
+		   sprintf((char *)TxBuffer,"f_gets error (%i)\r\n", fres);
+		   CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
+		   f_close(target_file);
+		   return -2;
+	   }
+	   if (br != size){
+		   sprintf((char *)TxBuffer,"File not read fully!\r\n");
+		   CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
+	   }
+	   f_close(target_file);
+	   return 0;
+}
+
 /* USER CODE END 4 */
 
 /**

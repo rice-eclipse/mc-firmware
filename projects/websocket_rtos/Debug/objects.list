@@ -2,6 +2,7 @@
 "./Core/Src/freertos.o"
 "./Core/Src/gpio.o"
 "./Core/Src/interface.o"
+"./Core/Src/jsmn.o"
 "./Core/Src/main.o"
 "./Core/Src/mongoose.o"
 "./Core/Src/rng.o"

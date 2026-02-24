@@ -150,7 +150,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of cmdMessageQueue */
-  cmdMessageQueueHandle = osMessageQueueNew (256, sizeof(char), &cmdMessageQueue_attributes);
+  cmdMessageQueueHandle = osMessageQueueNew (3, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -232,7 +232,7 @@ void StartServerTask(void *argument)
 	  mg_mgr_poll(&mgr, 10);
 	  //package the data in json for the websocket and send at each sending interval
 	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
-	  if (sending_flag & SEND_NOW){
+	  if (sending_flag == SEND_NOW){
 		  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
 		  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
 		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
@@ -350,7 +350,12 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
 	  CMDQUEUE_OBJ_T cmd;
       struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
       mg_ws_send(c, wm->data.buf, wm->data.len, WEBSOCKET_OP_TEXT);
-      snprintf(cmd.cmd_buf, sizeof(cmd.cmd_buf),wm->data.buf);
+      size_t len = wm->data.len;
+      if (len >= sizeof(cmd.cmd_buf)) {
+          len = sizeof(cmd.cmd_buf) - 1;
+      }
+      memcpy(cmd.cmd_buf, wm->data.buf, len);
+      cmd.cmd_buf[len] = '\0';
       cmd.cmd_idx = current_cmd_idx;
       current_cmd_idx++;
       if (current_cmd_idx > MAX_CMD_BACKLOG){

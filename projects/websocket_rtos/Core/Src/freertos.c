@@ -150,7 +150,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of cmdMessageQueue */
-  cmdMessageQueueHandle = osMessageQueueNew (3, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
+  cmdMessageQueueHandle = osMessageQueueNew (256, sizeof(char), &cmdMessageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -314,6 +314,9 @@ void StartCollectionTask(void *argument)
   {
 	   osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
 		 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
+		 			  sprintf(TxBuffer,"recorded val: %f\r\n", sensor_vals[sample_count]);
+		 			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+
 		 sample_count = (sample_count + 1) % (sensor_count*2);
 
 		 //First Buffer has been filled

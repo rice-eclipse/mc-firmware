@@ -19,6 +19,7 @@
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
 #include "fatfs.h"
+#include "lwip.h"
 #include "sdio.h"
 #include "spi.h"
 #include "usb_device.h"
@@ -47,6 +48,8 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
+uint32_t error_cnt;
+uint32_t phy_addr;
 uint8_t txBuffer[200];
 uint8_t TxBuffer[300];
 char RW_Buffer[200];
@@ -81,6 +84,7 @@ int main(void)
 
   /* USER CODE BEGIN 1 */
 	counter = 0;
+	phy_addr = 0;
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -101,10 +105,12 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
-  MX_USB_DEVICE_Init();
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
+  MX_LWIP_Init();
+  MX_USB_DEVICE_Init();
   /* USER CODE BEGIN 2 */
+  /*
   fres = (f_mount(&FatFs, "", 1));
   	if (fres != FR_OK){
   		sprintf((char *)txBuffer, "f_mount error (%i)\r\n", fres);
@@ -125,6 +131,10 @@ int main(void)
   	    }
   	    f_close(&Fil);
   	    read_file(&config_file, "config.json", config_str, 4000);
+  */
+     HAL_ETH_ReadPHYRegister(&heth, phy_addr, 0x1A, &error_cnt);
+      sprintf((char *)txBuffer, "Symbol Error Count (reg 26): %lu\r\n", error_cnt);
+      CDC_Transmit_FS(txBuffer, strlen((char *)txBuffer));
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -137,11 +147,17 @@ int main(void)
 	 HAL_GPIO_WritePin(HBT_GPIO_Port, HBT_Pin, GPIO_PIN_RESET);
 	 HAL_Delay(500);
 	 */
+	  /*
 	 float lc_voltage = get_sensorval(1, SPI2_CS_Pin);
 	 if (counter == 0)
 		 CDC_Transmit_FS(txBuffer, sprintf((char *)txBuffer, "%f\r\n",lc_voltage));
 	 HAL_Delay(1);
 	 counter = (counter+1)%400;
+	 */
+	 MX_LWIP_Process();
+	 HAL_ETH_ReadPHYRegister(&heth, phy_addr, 0x1A, &error_cnt);
+	      sprintf((char *)txBuffer, "Symbol Error Count (reg 26): %lu\r\n", error_cnt);
+	      CDC_Transmit_FS(txBuffer, strlen((char *)txBuffer));
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

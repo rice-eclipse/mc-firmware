@@ -38,6 +38,8 @@ typedef struct{
 	char cmd_buf[200];
 	uint8_t cmd_idx;
 } CMDQUEUE_OBJ_T;
+
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -46,6 +48,9 @@ typedef struct{
 #define FIRST_BUF_READY (1 << 0)
 #define SECOND_BUF_READY (1 << 1)
 #define SAMPLE_NOW (1 << 2)
+#define SHUTDOWN (1 << 3)
+#define LOGGING_STOPPED (1 << 4)
+#define STOP_LOGGING (1 << 5)
 #define SEND_NOW (1 << 7)
 /* USER CODE END PD */
 
@@ -75,6 +80,15 @@ int driver_states[MAX_DRIVER_COUNT];
 float *filled_buffer;
 float vals_to_send[MAX_SENSOR_COUNT];
 int driver_states_to_send[MAX_DRIVER_COUNT];
+
+//log and data file handles
+FIL data_file;
+FIL log_file;
+
+osMessageQueueId_t cmdMessageQueueHandle;
+const osMessageQueueAttr_t cmdMessageQueue_attributes = {
+  .name = "cmdMessageQueue"
+};
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -104,10 +118,19 @@ const osThreadAttr_t collectionTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityRealtime,
 };
-/* Definitions for cmdMessageQueue */
-osMessageQueueId_t cmdMessageQueueHandle;
-const osMessageQueueAttr_t cmdMessageQueue_attributes = {
-  .name = "cmdMessageQueue"
+/* Definitions for processingTask */
+osThreadId_t processingTaskHandle;
+const osThreadAttr_t processingTask_attributes = {
+  .name = "processingTask",
+  .stack_size = 512 * 4,
+  .priority = (osPriority_t) osPriorityNormal,
+};
+/* Definitions for shutdownTask */
+osThreadId_t shutdownTaskHandle;
+const osThreadAttr_t shutdownTask_attributes = {
+  .name = "shutdownTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -120,6 +143,8 @@ void StartDefaultTask(void *argument);
 void StartServerTask(void *argument);
 void StartCmdHandlingTask(void *argument);
 void StartCollectionTask(void *argument);
+void StartProcessingTask(void *argument);
+void StartShutdownTask(void *argument);
 
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
@@ -149,12 +174,8 @@ void MX_FREERTOS_Init(void) {
   /* start timers, add new ones, ... */
   /* USER CODE END RTOS_TIMERS */
 
-  /* Create the queue(s) */
-  /* creation of cmdMessageQueue */
-  cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
-
   /* USER CODE BEGIN RTOS_QUEUES */
-  /* add queues, ... */
+	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -169,6 +190,12 @@ void MX_FREERTOS_Init(void) {
 
   /* creation of collectionTask */
   collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
+
+  /* creation of processingTask */
+  processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
+
+  /* creation of shutdownTask */
+  shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -274,11 +301,11 @@ void StartCmdHandlingTask(void *argument)
 
 	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
-	/*
+
 	if (shutdown_flag == 1){
 		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
 	}
-	*/
+
 	if (stop_ignition_flag == 1){
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
 	}
@@ -286,6 +313,9 @@ void StartCmdHandlingTask(void *argument)
 		//ignition_sequence();
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
 		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		//start shutdown timer after ignition
+		HAL_TIM_Base_Start_IT(&htim11);
+
 	}
 	else if (actuation_flag == 1){
 		HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
@@ -336,6 +366,63 @@ void StartCollectionTask(void *argument)
     osDelay(1);
   }
   /* USER CODE END StartCollectionTask */
+}
+
+/* USER CODE BEGIN Header_StartProcessingTask */
+/**
+* @brief Function implementing the processingTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartProcessingTask */
+void StartProcessingTask(void *argument)
+{
+  /* USER CODE BEGIN StartProcessingTask */
+  /* Infinite loop */
+  for(;;)
+  {
+    osDelay(1);
+  }
+  /* USER CODE END StartProcessingTask */
+}
+
+/* USER CODE BEGIN Header_StartShutdownTask */
+/**
+* @brief Function implementing the ShutdownTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartShutdownTask */
+void StartShutdownTask(void *argument)
+{
+  /* USER CODE BEGIN StartShutdownTask */
+	uint32_t shutdown_flag;
+  /* Infinite loop */
+  for(;;)
+  {
+	  shutdown_flag = osThreadFlagsWait(SHUTDOWN, osFlagsWaitAny, osWaitForever);
+	  	/*Tell processing task to stop*/
+	  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
+	  	osThreadFlagsSet(processingTaskHandle, STOP_LOGGING);
+
+	  	/*Waits for processing to stop*/
+	  	shutdown_flag = osThreadFlagsWait(LOGGING_STOPPED, osFlagsWaitAny, osWaitForever);
+
+	  	close_file_interface(&data_file);
+	  	close_file_interface(&log_file);
+	  	unmount_sd_interface();
+	  	if (collectionTaskHandle != NULL){
+	  		osThreadTerminate(collectionTaskHandle);
+	  	}
+	  	if (processingTaskHandle != NULL){
+	  		osThreadTerminate(processingTaskHandle);
+	  	}
+	  	sprintf(TxBuffer, "All tasks closed\r\n");
+	  	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+	  	osThreadExit();
+	      osDelay(1);
+  }
+  /* USER CODE END StartShutdownTask */
 }
 
 /* Private application code --------------------------------------------------*/
@@ -407,6 +494,9 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
   if (htim->Instance == TIM13){
 	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
+  }
+  if (htim->Instance == TIM11){
+	  osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
   }
 
   /* USER CODE END Callback 1 */

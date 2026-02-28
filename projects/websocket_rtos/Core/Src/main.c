@@ -127,6 +127,7 @@ int main(void)
   MX_SPI1_Init();
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
+  MX_TIM11_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
@@ -204,7 +205,6 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None

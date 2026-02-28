@@ -59,6 +59,8 @@
 static char TxBuffer[300];
 static char config_str[4000];
 char rx_buffer[52];
+FATFS FatFs; 	//Fatfs handle
+FIL config_file;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -128,12 +130,12 @@ int main(void)
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
-  //mount_sd_interface(&FatFs);
+  mount_sd_interface(&FatFs);
 
   /*parse the configuration file to get the available sensors and drivers */
-  read_file_interface("config.json", config_str,4000);
-  parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password,
-		  	  	  	  &port, &sampling_freq_ign, &sampling_freq_standby, &driver_count, &sensor_count, &monitor_count);
+  read_file_interface(&config_file, "config.json", config_str,4000);
+       parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password, &port, &sampling_freq_ign, &sampling_freq_standby,
+     		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
 
 
   /* USER CODE END 2 */
@@ -202,28 +204,6 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
-
-/**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM7 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
-void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-{
-  /* USER CODE BEGIN Callback 0 */
-
-  /* USER CODE END Callback 0 */
-  if (htim->Instance == TIM7)
-  {
-    HAL_IncTick();
-  }
-  /* USER CODE BEGIN Callback 1 */
-
-  /* USER CODE END Callback 1 */
-}
 
 /**
   * @brief  This function is executed in case of error occurrence.

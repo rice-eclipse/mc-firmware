@@ -25,6 +25,8 @@ Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr_ex.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rng.h \
+ ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_sd.h \
+ ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_ll_sdmmc.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_spi.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_tim.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_tim_ex.h \
@@ -32,7 +34,15 @@ Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pcd.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_ll_usb.h \
  ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pcd_ex.h \
- ../Core/Inc/spi.h ../Core/Inc/cJSON.h ../Core/Inc/usart.h
+ ../FATFS/App/fatfs.h ../Middlewares/Third_Party/FatFs/src/ff.h \
+ ../Middlewares/Third_Party/FatFs/src/integer.h ../FATFS/Target/ffconf.h \
+ ../Core/Inc/main.h ../FATFS/Target/bsp_driver_sd.h \
+ ../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h \
+ ../Middlewares/Third_Party/FatFs/src/diskio.h \
+ ../Middlewares/Third_Party/FatFs/src/ff.h \
+ ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h \
+ ../Core/Inc/spi.h ../Core/Inc/cJSON.h ../Core/Inc/usart.h \
+ ../Core/Inc/utils.h ../Core/Inc/cJSON.h ../Core/Inc/usart.h
 ../Core/Inc/interface.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal.h:
@@ -61,6 +71,8 @@ Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pwr_ex.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_rng.h:
+../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_sd.h:
+../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_ll_sdmmc.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_spi.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_tim.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_tim_ex.h:
@@ -68,6 +80,19 @@ Core/Src/interface.o: ../Core/Src/interface.c ../Core/Inc/interface.h \
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pcd.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_ll_usb.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal_pcd_ex.h:
+../FATFS/App/fatfs.h:
+../Middlewares/Third_Party/FatFs/src/ff.h:
+../Middlewares/Third_Party/FatFs/src/integer.h:
+../FATFS/Target/ffconf.h:
+../Core/Inc/main.h:
+../FATFS/Target/bsp_driver_sd.h:
+../Middlewares/Third_Party/FatFs/src/ff_gen_drv.h:
+../Middlewares/Third_Party/FatFs/src/diskio.h:
+../Middlewares/Third_Party/FatFs/src/ff.h:
+../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h:
 ../Core/Inc/spi.h:
+../Core/Inc/cJSON.h:
+../Core/Inc/usart.h:
+../Core/Inc/utils.h:
 ../Core/Inc/cJSON.h:
 ../Core/Inc/usart.h:

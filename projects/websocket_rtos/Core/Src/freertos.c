@@ -61,6 +61,7 @@ static const char *s_web_root = ".";
 static const char *s_ca_path = "ca.pem";
 static const char *s_cert_path = "cert.pem";
 static const char *s_key_path = "key.pem";
+char ip_addr[100];
 struct mg_str s_ca, s_cert, s_key;
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
@@ -150,7 +151,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of cmdMessageQueue */
-  cmdMessageQueueHandle = osMessageQueueNew (256, sizeof(char), &cmdMessageQueue_attributes);
+  cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -222,10 +223,11 @@ void StartDefaultTask(void *argument)
 void StartServerTask(void *argument)
 {
   /* USER CODE BEGIN StartServerTask */
+	sprintf(ip_addr, "http://%s:%d",host_ip,port);
 	uint32_t sending_flag;
 	 struct mg_mgr mgr;
 	  mg_mgr_init(&mgr);
-	  mg_http_listen(&mgr, "http://192.168.0.121:8000", fn, NULL);  // Create HTTP listener
+	  mg_http_listen(&mgr, ip_addr, fn, NULL);  // Create HTTP listener
   /* Infinite loop */
   for(;;)
   {

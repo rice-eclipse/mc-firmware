@@ -150,7 +150,7 @@ void MX_FREERTOS_Init(void) {
 
   /* Create the queue(s) */
   /* creation of cmdMessageQueue */
-  cmdMessageQueueHandle = osMessageQueueNew (256, sizeof(char), &cmdMessageQueue_attributes);
+  cmdMessageQueueHandle = osMessageQueueNew (5, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
   /* add queues, ... */
@@ -269,6 +269,7 @@ void StartCmdHandlingTask(void *argument)
   for(;;)
   {
 	osMessageQueueGet(cmdMessageQueueHandle, &cmd, NULL, osWaitForever);
+
 	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
 	/*
@@ -282,11 +283,11 @@ void StartCmdHandlingTask(void *argument)
 	else if (ignition_flag == 1){
 		//ignition_sequence();
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
+		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 	}
 	else if (actuation_flag == 1){
 		HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
 		sprintf(TxBuffer, "Actuating Driver %u. Direction: %d", driver_list[driver_id].GPIO_Pin, direction);
-		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 
 		//TODO: use driver current monitors to verify this
@@ -314,7 +315,7 @@ void StartCollectionTask(void *argument)
   {
 	   osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
 		 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
-		 			  sprintf(TxBuffer,"recorded val: %f\r\n", sensor_vals[sample_count]);
+		 			  //sprintf(TxBuffer,"recorded val: %f\r\n", sensor_vals[sample_count]);
 		 			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 
 		 sample_count = (sample_count + 1) % (sensor_count*2);
@@ -360,6 +361,8 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
       memcpy(cmd.cmd_buf, wm->data.buf, len);
       cmd.cmd_buf[len] = '\0';
       cmd.cmd_idx = current_cmd_idx;
+      //sprintf(TxBuffer, "received data %s\r\n",cmd.cmd_buf);
+      //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
       current_cmd_idx++;
       if (current_cmd_idx > MAX_CMD_BACKLOG){
     	  //trigger shutdown condition

@@ -200,11 +200,6 @@ void SystemClock_Config(void)
 /* USER CODE END 4 */
 
 /**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM7 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a dir
-
-/**
   * @brief  This function is executed in case of error occurrence.
   * @retval None
   */

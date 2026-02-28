@@ -10,7 +10,7 @@
 #include "cJSON.h"
 #include "usart.h"
 #include <stdio.h>
-
+#include <stdlib.h>
 
 static char TxBuffer[300];
 /******************************************************************************************/
@@ -245,7 +245,7 @@ int read_file_interface(const char *filename, char *data_buffer, size_t buffer_s
 	    "\"sampling_freq_standby\": 1,"
 	    "\"sensors\": ["
 	    "  {"
-	    "    \"sensor\": \"tc1:ox_tank\","
+	    "    \"sensor\": \"lc1:main_loac_cell\","
 	    "    \"channel\": 0,"
 	    "    \"adc_cs\": 1,"
 	    "    \"calibration_intercept\": 32,"
@@ -253,7 +253,7 @@ int read_file_interface(const char *filename, char *data_buffer, size_t buffer_s
 	    "    \"enabled\": \"true\""
 	    "  },"
 	    "  {"
-	    "    \"sensor\": \"tc2:combustion_chamber\","
+	    "    \"sensor\": \"pt2:feed_line\","
 	    "    \"channel\": 1,"
 	    "    \"adc_cs\": 1,"
 	    "    \"calibration_intercept\": 32,"
@@ -265,7 +265,7 @@ int read_file_interface(const char *filename, char *data_buffer, size_t buffer_s
 	    "    \"channel\": 0,"
 	    "    \"adc_cs\": 2,"
 	    "    \"calibration_intercept\": 0.4664,"
-	    "    \"calibration_slope\": 0.0019,"
+	    "    \"calibration_slope\": 1.0019,"
 	    "    \"enabled\": \"true\""
 	    "  }"
 	    "],"
@@ -343,7 +343,9 @@ int mount_sd_interface(FATFS* FatFs){
 }
 */
 float get_sensorval_interface(sensor *current_sensor){
-	uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
+	static uint16_t adc_val = 0;
+	//uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
+	adc_val = (adc_val + 1) % 100;
 	float voltage = (adc_val)*4.096/4096;
 	float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
 	return sensor_val;
@@ -388,7 +390,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 		const char *error_ptr = cJSON_GetErrorPtr();
 		if (error_ptr != NULL) {
 			sprintf(TxBuffer, "Error before: %s\n", error_ptr);
-			//HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+			HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		}
 		status = 1;
 		goto end;
@@ -403,14 +405,14 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	}
 	cmd_type = cJSON_GetObjectItemCaseSensitive(cmd, "type");
 	/* If an actuate command is given, parse the target driver and the direction */
-	if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "actuate") == 0) {
-		drv_id = cJSON_GetObjectItemCaseSensitive(cmd, "driver-id");
+	if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "Actuate") == 0) {
+		drv_id = cJSON_GetObjectItemCaseSensitive(cmd, "driver_id");
 		// if the input driver id is valid and the direction is valid, save the id and direction
-		if (cJSON_IsNumber(drv_id)) {
+		if (cJSON_IsString(drv_id)) {
 			dir = cJSON_GetObjectItemCaseSensitive(cmd, "value");
-			if (cJSON_IsNumber(dir)) {
-				*driver_id = drv_id->valueint;
-				*direction = dir->valueint;
+			if (cJSON_IsBool(dir)) {
+				*driver_id = atoi(drv_id->valuestring);
+				*direction = (cJSON_IsTrue(dir)) ? 1:0;
 				*actuation_flag = 1;
 
 				status = 0;
@@ -424,7 +426,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 		}
 
 	}
-	else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring,"Ignition") == 0){
+	else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring,"Proxima Ignition") == 0){
 		*ignition_flag = 1;
 	}
 	else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring,"EmergencyStop") == 0){

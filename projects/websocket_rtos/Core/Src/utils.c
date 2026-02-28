@@ -137,8 +137,8 @@ int parse_config(const char *config_str,
 		            if (strcmp(enabled,"true") == 0) {
 		                driver new_driver;
 		                char *gpio_port = cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_port")->valuestring;
-		                if (strcmp(gpio_port, "GPIOA") == 0) {
-		                    new_driver.GPIO_Port = GPIOA;
+		                if (strcmp(gpio_port, "GPIOF") == 0) {
+		                    new_driver.GPIO_Port = GPIOF;
 		                } else if (strcmp(gpio_port, "GPIOB") == 0) {
 		                    new_driver.GPIO_Port = GPIOB;
 		                } else {

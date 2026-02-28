@@ -81,9 +81,17 @@ float *filled_buffer;
 float vals_to_send[MAX_SENSOR_COUNT];
 int driver_states_to_send[MAX_DRIVER_COUNT];
 
+//stores the sensor values in a single string to write to the sd card
+char sdcard_data[4096];
+char logging_str[100];
+
+//str for data header
+char data_header_str[300];
 //log and data file handles
 FIL data_file;
 FIL log_file;
+
+volatile int stop_logging;
 
 osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
@@ -137,6 +145,7 @@ const osThreadAttr_t shutdownTask_attributes = {
 /* USER CODE BEGIN FunctionPrototypes */
 static void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
+void add_datafile_header();
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -183,19 +192,19 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of serverTask */
-  serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+  //serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
 
   /* creation of cmdHandlingTask */
-  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+  //cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
   /* creation of collectionTask */
-  collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
+  //collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
 
   /* creation of processingTask */
-  processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
+  //processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
 
   /* creation of shutdownTask */
-  shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
+  //shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -224,13 +233,16 @@ void StartDefaultTask(void *argument)
  	  osDelay(200);
    MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
 
-   /*Start the timers and the rest of the tasks*/
+   /*Start the timers and the rest of the tasks and creates the necessary files*/\
+   create_file_interface(&data_file,"data.csv");
+   create_file_interface(&log_file,"console.log");
    collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
   cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+  processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
+  shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
    HAL_TIM_Base_Start_IT(&htim14);
    HAL_TIM_Base_Start_IT(&htim13);
-
    osThreadExit();
   /* Infinite loop */
   for(;;)
@@ -354,12 +366,12 @@ void StartCollectionTask(void *argument)
 
 		 //First Buffer has been filled
 		 if (sample_count == sensor_count){
-			 //osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+			 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
 			 filled_buffer = &sensor_vals[0];
 		 }
 		 //second buffer filled
 		 else if (sample_count == 0){
-			 //osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+			 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 			 filled_buffer = &sensor_vals[sensor_count];
 		 }
 
@@ -378,9 +390,95 @@ void StartCollectionTask(void *argument)
 void StartProcessingTask(void *argument)
 {
   /* USER CODE BEGIN StartProcessingTask */
+	uint32_t processing_flag;
+	uint32_t stopLogging_flag;
+	int sd_card_pos = 0;
+	int log_count = 0;
+	float *current_buffer;
+	open_file_interface(&data_file, "data.csv");
+	add_datafile_header();
+	open_file_interface(&log_file, "console.log");
+	/*We sync the file to the sd card every second*/
+	int sync_count = 0;
+#ifndef TEST_LOGIC
+	FRESULT fres;
+#endif
   /* Infinite loop */
   for(;;)
   {
+	  processing_flag = osThreadFlagsWait((FIRST_BUF_READY | SECOND_BUF_READY),
+	  			  	  	  	  	  	  	  	  osFlagsWaitAny, osWaitForever);
+
+	  //set the current buf pointer to the first part of the data buffer
+	  if (processing_flag & FIRST_BUF_READY){
+		  current_buffer = &sensor_vals[0];
+	  }
+	  else if (processing_flag & SECOND_BUF_READY){
+		  current_buffer = &sensor_vals[sensor_count];
+	  }
+	  stopLogging_flag = osThreadFlagsWait(STOP_LOGGING, (osFlagsWaitAny|osFlagsNoClear), 10);
+	  //if a shutdown flag is set, we don't perform any more logging operations and let the shutdown task know it can access the sd card
+	  if (stopLogging_flag == STOP_LOGGING){
+		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
+	  }
+	  //perform filtering and decimation and log data to sd card
+	  else{
+		  filter_and_decimate_interface(current_buffer, sensor_count);
+		  sdcard_data[0] = '\0';
+
+		  //writes the all the sensor data collected in the current timestep to the sd write buffer
+		  for (int i = 0; i < sensor_count; i++){
+
+			  sprintf(TxBuffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
+																	   current_buffer[i]);
+			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
+
+			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f,",current_buffer[i]);
+			  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
+				  //sprintf(TxBuffer, "buffer full!\r\n");
+				  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+				  //drop the data in this cycle
+				  sd_card_pos = 0;
+				  break;
+			  }
+		  }
+
+		  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "\r\n");
+		  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
+				  //sprintf(TxBuffer, "buffer full!\r\n");
+				  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+				  //drop the data in this cycle
+				  sd_card_pos = 0;
+			  }
+		 //write to the sd card after 20 lines have been stored in the buffer
+		  log_count++;
+		  if (log_count == 20){
+			  //sprintf(TxBuffer, "sd write\r\n");
+			  sprintf(logging_str,"sd write\r\n");
+			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), 200);
+			  log_count = 0;
+  #ifndef TEST_LOGIC
+			  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
+			  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
+  #endif
+			  //clear the sd write buffer for the next cycle
+			  sd_card_pos = 0;
+			  memset(sdcard_data, 0, sizeof(sdcard_data));
+		  }
+		  //flush cache back to sd card every second
+  sync_count = (sync_count + 1) % sampling_freq_ign;
+		  if (sync_count == 0){
+			  sprintf(TxBuffer, "synced data\r\n");
+			  HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		  }
+  #ifndef TEST_LOGIC
+		  /*sync data to SD card every second*/
+		  if (sync_count == 0){
+			  f_sync(&data_file);
+			  f_sync(&log_file);
+		  }
+	#endif
+	  }
     osDelay(1);
   }
   /* USER CODE END StartProcessingTask */
@@ -397,16 +495,17 @@ void StartShutdownTask(void *argument)
 {
   /* USER CODE BEGIN StartShutdownTask */
 	uint32_t shutdown_flag;
+	uint32_t stoppedLogging_flag;
   /* Infinite loop */
   for(;;)
   {
 	  shutdown_flag = osThreadFlagsWait(SHUTDOWN, osFlagsWaitAny, osWaitForever);
 	  	/*Tell processing task to stop*/
 	  HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
-	  	osThreadFlagsSet(processingTaskHandle, STOP_LOGGING);
+	  osThreadFlagsSet(processingTaskHandle, STOP_LOGGING);
 
 	  	/*Waits for processing to stop*/
-	  	shutdown_flag = osThreadFlagsWait(LOGGING_STOPPED, osFlagsWaitAny, osWaitForever);
+	  	stoppedLogging_flag = osThreadFlagsWait(LOGGING_STOPPED, osFlagsWaitAny, osWaitForever);
 
 	  	close_file_interface(&data_file);
 	  	close_file_interface(&log_file);
@@ -500,6 +599,28 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
 
   /* USER CODE END Callback 1 */
+}
+
+void add_datafile_header(){
+	int card_pos = 0;
+	data_header_str[0] = '\0';
+	for (int i = 0; i < sensor_count; i++){
+		card_pos += snprintf(data_header_str+card_pos,sizeof(data_header_str) - card_pos,"%s,",
+							 sensor_list[i].name);
+		if (card_pos <= 0 || card_pos > sizeof(data_header_str)){
+			 sprintf(TxBuffer, "sensor list array corrupted!\r\n");
+			 HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		}
+	}
+	card_pos += snprintf(data_header_str+card_pos, sizeof(data_header_str)-card_pos, "\r\n");
+	if (card_pos <= 0 || card_pos > sizeof(data_header_str)){
+			 sprintf(TxBuffer, "sensor list array corrupted!\r\n");
+			 HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+
+		}
+#ifndef TEST_LOGIC
+	append_file_interface(&data_file, data_header_str, card_pos);
+#endif
 }
 /* USER CODE END Application */
 

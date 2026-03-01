@@ -26,7 +26,7 @@ Clone the repository
 
 Open STM32CubeIDE and set the root directory of the repository as the workspace
 
-Build `f407-firmware` to build the code for the controller running on the engine control box 
+Build `projects/websocket_rtos` to build the code for the current development version of the software running on the F207 Nucleo board 
 
 Run the code using the GUI 
 
@@ -46,6 +46,18 @@ The system is divided into isolated tasks managed by the FreeRTOS scheduler:
 3. **Data Sending**
    * Writes flight data to SD Card for onboard storage.
    * Transmits real-time data via WebSocket to the Ground Station Dashboard (Quonkboard) at a decimated interval.
+## Relevant files
+The following files are found in `projects/websocket_rtos/Core/Src`
+1. `main.c`
+   * Entry point into the program
+   * Initializes all the peripherals
+2. `freertos.c`
+ * Application code: contains all the tasks for the program
+3. `interface.c`
+   * Provides a wrapper around hardware drivers and helper functions that rely on FatFS
+   * Allows the user to run the program without an SD card by setting the appropriate preprocessor directive `TEST_LOGIC`
+4. `utils.c`
+  * contains the hardware drivers and helper functions for the main application
 
 ## Development Environment
 * **Language:** C

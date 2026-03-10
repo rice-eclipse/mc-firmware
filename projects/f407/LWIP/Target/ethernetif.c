@@ -623,7 +623,9 @@ void ethernet_link_check_state(struct netif *netif)
   int32_t PHYLinkState = 0;
   uint32_t linkchanged = 0U, speed = 0U, duplex = 0U;
 
-  LAN8742_SetLinkState(&LAN8742, LAN8742_STATUS_100MBITS_FULLDUPLEX );
+  //LAN8742_SetLinkState(&LAN8742, LAN8742_STATUS_100MBITS_FULLDUPLEX );
+  //restart autonegoti
+  LAN8742_StartAutoNego(&LAN8742);
   PHYLinkState = LAN8742_GetLinkState(&LAN8742);
 
   if(netif_is_link_up(netif) && (PHYLinkState <= LAN8742_STATUS_LINK_DOWN))
@@ -671,6 +673,7 @@ void ethernet_link_check_state(struct netif *netif)
       netif_set_up(netif);
       netif_set_link_up(netif);
     }
+
   }
 
 }

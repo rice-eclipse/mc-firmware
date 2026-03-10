@@ -13,6 +13,6 @@
 ../LWIP/Target/ethernetif.c:597:9:ETH_PHY_IO_WriteReg	24	static
 ../LWIP/Target/ethernetif.c:611:9:ETH_PHY_IO_GetTick	8	static
 ../LWIP/Target/ethernetif.c:620:6:ethernet_link_check_state	136	static
-../LWIP/Target/ethernetif.c:678:6:HAL_ETH_RxAllocateCallback	32	static
-../LWIP/Target/ethernetif.c:700:6:HAL_ETH_RxLinkCallback	40	static
-../LWIP/Target/ethernetif.c:737:6:HAL_ETH_TxFreeCallback	16	static
+../LWIP/Target/ethernetif.c:681:6:HAL_ETH_RxAllocateCallback	32	static
+../LWIP/Target/ethernetif.c:703:6:HAL_ETH_RxLinkCallback	40	static
+../LWIP/Target/ethernetif.c:740:6:HAL_ETH_TxFreeCallback	16	static

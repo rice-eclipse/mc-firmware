@@ -60,6 +60,7 @@ FIL Fil;
 FRESULT fres;
 FIL config_file;
 int counter;
+
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -132,9 +133,7 @@ int main(void)
   	    f_close(&Fil);
   	    read_file(&config_file, "config.json", config_str, 4000);
   */
-     HAL_ETH_ReadPHYRegister(&heth, phy_addr, 0x1A, &error_cnt);
-      sprintf((char *)txBuffer, "Symbol Error Count (reg 26): %lu\r\n", error_cnt);
-      CDC_Transmit_FS(txBuffer, strlen((char *)txBuffer));
+
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -155,9 +154,8 @@ int main(void)
 	 counter = (counter+1)%400;
 	 */
 	 MX_LWIP_Process();
-	 HAL_ETH_ReadPHYRegister(&heth, phy_addr, 0x1A, &error_cnt);
-	      sprintf((char *)txBuffer, "Symbol Error Count (reg 26): %lu\r\n", error_cnt);
-	      CDC_Transmit_FS(txBuffer, strlen((char *)txBuffer));
+
+
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */

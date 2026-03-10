@@ -119,7 +119,7 @@ static void Ethernet_Link_Periodic_Handle(struct netif *netif)
 /* USER CODE END 4_4_1 */
 
   /* Ethernet Link every 100ms */
-  if (HAL_GetTick() - EthernetLinkTimer >= 100)
+  if (HAL_GetTick() - EthernetLinkTimer >= 200)
   {
     EthernetLinkTimer = HAL_GetTick();
     ethernet_link_check_state(netif);

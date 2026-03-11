@@ -1,0 +1,7 @@
+../Core/Src/interface.c:19:5:parse_config_interface	38
+../Core/Src/interface.c:236:5:read_file_interface	2
+../Core/Src/interface.c:344:7:get_sensorval_interface	1
+../Core/Src/interface.c:350:10:get_mcp3208_adcval	1
+../Core/Src/interface.c:369:6:filter_and_decimate_interface	1
+../Core/Src/interface.c:372:5:parse_command_interface	14
+../Core/Src/interface.c:441:6:sensor_message_interface	9

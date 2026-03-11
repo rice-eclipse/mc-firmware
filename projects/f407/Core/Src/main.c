@@ -18,15 +18,21 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
-#include "fatfs.h"
+#include "cmsis_os.h"
 #include "lwip.h"
-#include "sdio.h"
+#include "rng.h"
 #include "spi.h"
+#include "tim.h"
 #include "usb_device.h"
 #include "gpio.h"
 
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
+#include "cJSON.h"
+#include "interface.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include "usbd_cdc_if.h"
 /* USER CODE END Includes */
 
@@ -48,32 +54,37 @@
 /* Private variables ---------------------------------------------------------*/
 
 /* USER CODE BEGIN PV */
-uint32_t error_cnt;
-uint32_t phy_addr;
-uint8_t txBuffer[200];
 uint8_t TxBuffer[300];
-char RW_Buffer[200];
 static char config_str[4000];
-UINT WWC;
-FATFS FatFs;
-FIL Fil;
-FRESULT fres;
-FIL config_file;
 int counter;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
+void MX_FREERTOS_Init(void);
 /* USER CODE BEGIN PFP */
-uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
-float get_sensorval(int channel, uint16_t adc_cs);
-int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-
+int port = 0;
+int sampling_freq_ign = 0;
+int sampling_freq_standby = 0;
+char *console_filename = NULL;
+char cmd_password[MAX_PWD_LENGTH];
+char *data_filename = NULL;
+char *cmd_buffer = NULL;
+char host_ip[MAX_IP_LEN];
+osEventFlagsId_t command_event;
+int sensor_count = MAX_SENSOR_COUNT;
+int driver_count = MAX_DRIVER_COUNT;
+int monitor_count = MAX_MONITOR_COUNT;
+driver driver_list[MAX_DRIVER_COUNT];
+driver ignition;
+monitor monitor_list[MAX_MONITOR_COUNT];
+sensor sensor_list[MAX_SENSOR_COUNT];
 /* USER CODE END 0 */
 
 /**
@@ -84,8 +95,7 @@ int main(void)
 {
 
   /* USER CODE BEGIN 1 */
-	counter = 0;
-	phy_addr = 0;
+
   /* USER CODE END 1 */
 
   /* MCU Configuration--------------------------------------------------------*/
@@ -106,11 +116,17 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_SPI2_Init();
-  MX_SDIO_SD_Init();
-  MX_FATFS_Init();
-  MX_LWIP_Init();
-  MX_USB_DEVICE_Init();
+  MX_RNG_Init();
+  MX_TIM13_Init();
+  MX_TIM14_Init();
   /* USER CODE BEGIN 2 */
+  /*Mount the sd card to read information from it*/
+  HAL_Delay(1);
+  //mount_sd_interface(&FatFs)
+  /*parse the configuration file to get the available sensors and drivers */
+   read_file_interface("config.json", config_str,4000);
+   parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password,
+ 		  	  	  	  &port, &sampling_freq_ign, &sampling_freq_standby, &driver_count, &sensor_count, &monitor_count);
   /*
   fres = (f_mount(&FatFs, "", 1));
   	if (fres != FR_OK){
@@ -136,6 +152,15 @@ int main(void)
 
   /* USER CODE END 2 */
 
+  /* Init scheduler */
+  osKernelInitialize();  /* Call init function for freertos objects (in cmsis_os2.c) */
+  MX_FREERTOS_Init();
+
+  /* Start scheduler */
+  osKernelStart();
+
+  /* We should never get here as control is now taken by the scheduler */
+
   /* Infinite loop */
   /* USER CODE BEGIN WHILE */
   while (1)
@@ -153,7 +178,7 @@ int main(void)
 	 HAL_Delay(1);
 	 counter = (counter+1)%400;
 	 */
-	 MX_LWIP_Process();
+
 
 
     /* USER CODE END WHILE */
@@ -209,68 +234,34 @@ void SystemClock_Config(void)
 }
 
 /* USER CODE BEGIN 4 */
-uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle){
-	uint8_t tx[3];
-	uint8_t rx[3];
-
-	//start + single-ended + D2
-	tx[0] = 0x06 | ((channel & 0x04) >> 2);
-	//D1 + D0 shifted to B7 and B6
-	tx[1] = (channel & 0x03) << 6;
-	//don't care
-	tx[2] = 0x00;
-
-	HAL_GPIO_WritePin(GPIOE, cs, GPIO_PIN_RESET);
-	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(GPIOE, cs, GPIO_PIN_SET);
-
-	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
-
-	return dataBuff;
-}
-float get_sensorval(int channel, uint16_t adc_cs){
-	uint16_t adc_val = get_mcp3208_adcval(channel, adc_cs, &hspi2);
-	float voltage = (adc_val)*4.096/4096;
-	//float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
-	return voltage;
-}
-
-int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size)
-{
-
-	FRESULT fres;
-	fres = f_open(target_file, filename, FA_READ);
-	   if(fres != FR_OK) {
-		sprintf((char *)TxBuffer,"f_open error (%i)\r\n", fres);
-		CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
-		return -2;
-	   }
-
-	   //get the number of characters to allocate to this string
-	   long size = f_size(target_file);
-	   if (size > buffer_size){
-		   sprintf((char *)TxBuffer, "Error: Input buffer size too small \r\n");
-		   CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
-		   f_close(target_file);
-		   return -2;
-	   }
-	   UINT br = 0;
-	   FRESULT rres = f_read(target_file,(void *)data_buffer,size, &br);
-	   if(rres != FR_OK) {
-		   sprintf((char *)TxBuffer,"f_gets error (%i)\r\n", fres);
-		   CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
-		   f_close(target_file);
-		   return -2;
-	   }
-	   if (br != size){
-		   sprintf((char *)TxBuffer,"File not read fully!\r\n");
-		   CDC_Transmit_FS(TxBuffer, strlen((char *)TxBuffer));
-	   }
-	   f_close(target_file);
-	   return 0;
+void print_buffer(char *buffer, int buf_len){
+	CDC_Transmit_FS((uint8_t *)buffer,buf_len);
+	return;
 }
 
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM7 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+{
+  /* USER CODE BEGIN Callback 0 */
+
+  /* USER CODE END Callback 0 */
+  if (htim->Instance == TIM7)
+  {
+    HAL_IncTick();
+  }
+  /* USER CODE BEGIN Callback 1 */
+
+  /* USER CODE END Callback 1 */
+}
 
 /**
   * @brief  This function is executed in case of error occurrence.

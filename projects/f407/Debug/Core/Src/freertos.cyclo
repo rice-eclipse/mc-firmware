@@ -1,0 +1,6 @@
+../Core/Src/freertos.c:105:6:MX_FREERTOS_Init	1
+../Core/Src/freertos.c:153:6:StartDefaultTask	3
+../Core/Src/freertos.c:182:6:StartServerTask	1
+../Core/Src/freertos.c:204:6:StartCmdHandlingTask	4
+../Core/Src/freertos.c:245:6:fn	5
+../Core/Src/freertos.c:271:8:mg_random	3

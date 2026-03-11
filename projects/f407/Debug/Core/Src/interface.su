@@ -1,0 +1,7 @@
+../Core/Src/interface.c:19:5:parse_config_interface	200	static
+../Core/Src/interface.c:236:5:read_file_interface	32	static
+../Core/Src/interface.c:344:7:get_sensorval_interface	32	static
+../Core/Src/interface.c:350:10:get_mcp3208_adcval	48	static
+../Core/Src/interface.c:369:6:filter_and_decimate_interface	16	static
+../Core/Src/interface.c:372:5:parse_command_interface	56	static
+../Core/Src/interface.c:441:6:sensor_message_interface	80	static

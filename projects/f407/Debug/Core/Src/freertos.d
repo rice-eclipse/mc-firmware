@@ -53,6 +53,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
  ../Middlewares/Third_Party/LwIP/system/arch/cpu.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip4_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
@@ -147,6 +148,7 @@ Core/Src/freertos.o: ../Core/Src/freertos.c \
 ../Middlewares/Third_Party/LwIP/system/arch/cpu.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip4_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:

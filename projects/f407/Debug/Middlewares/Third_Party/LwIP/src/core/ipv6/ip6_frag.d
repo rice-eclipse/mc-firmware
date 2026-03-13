@@ -44,6 +44,7 @@ Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_frag.o: \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/netif.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h \
@@ -107,6 +108,7 @@ Middlewares/Third_Party/LwIP/src/core/ipv6/ip6_frag.o: \
 ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/netif.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h:

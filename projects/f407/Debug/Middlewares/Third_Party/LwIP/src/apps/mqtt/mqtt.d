@@ -44,6 +44,7 @@ Middlewares/Third_Party/LwIP/src/apps/mqtt/mqtt.o: \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip4_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
@@ -128,6 +129,7 @@ Middlewares/Third_Party/LwIP/src/apps/mqtt/mqtt.o: \
 ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip4_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:

@@ -246,6 +246,7 @@ static void low_level_init(struct netif *netif)
 
   hal_eth_init_status = HAL_ETH_Init(&heth);
 
+
   if (hal_eth_init_status == HAL_OK)
   {
     /* Set netif link flag */

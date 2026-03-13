@@ -50,6 +50,7 @@ LWIP/App/lwip.o: ../LWIP/App/lwip.c ../LWIP/App/lwip.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip4_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/netif.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h \
@@ -131,6 +132,7 @@ LWIP/App/lwip.o: ../LWIP/App/lwip.c ../LWIP/App/lwip.h \
 ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip4_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/netif.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip_addr.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/ip6_addr.h:

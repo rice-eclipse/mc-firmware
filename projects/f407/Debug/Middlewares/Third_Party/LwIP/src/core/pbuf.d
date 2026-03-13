@@ -48,6 +48,7 @@ Middlewares/Third_Party/LwIP/src/core/pbuf.o: \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/priv/memp_priv.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/priv/mem_priv.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/sys.h \
  ../Middlewares/Third_Party/LwIP/system/arch/sys_arch.h \
  ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h \
@@ -128,6 +129,7 @@ Middlewares/Third_Party/LwIP/src/core/pbuf.o: \
 ../Middlewares/Third_Party/LwIP/src/include/lwip/priv/memp_priv.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/priv/mem_priv.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/sys.h:
 ../Middlewares/Third_Party/LwIP/system/arch/sys_arch.h:
 ../Middlewares/Third_Party/FreeRTOS/Source/CMSIS_RTOS_V2/cmsis_os.h:

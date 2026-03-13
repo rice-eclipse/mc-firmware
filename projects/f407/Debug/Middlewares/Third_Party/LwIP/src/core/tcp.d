@@ -40,6 +40,7 @@ Middlewares/Third_Party/LwIP/src/core/tcp.o: \
  ../Middlewares/Third_Party/LwIP/system/arch/cc.h \
  ../Middlewares/Third_Party/LwIP/system/arch/cpu.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/mem.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/memp.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/priv/memp_std.h \
@@ -106,6 +107,7 @@ Middlewares/Third_Party/LwIP/src/core/tcp.o: \
 ../Middlewares/Third_Party/LwIP/system/arch/cc.h:
 ../Middlewares/Third_Party/LwIP/system/arch/cpu.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/mem.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/memp.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/priv/memp_std.h:

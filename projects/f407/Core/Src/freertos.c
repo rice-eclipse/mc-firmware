@@ -128,10 +128,10 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of serverTask */
-  serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+  //serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
 
   /* creation of cmdHandlingTask */
-  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+  //cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
@@ -163,6 +163,7 @@ void StartDefaultTask(void *argument)
   	  osDelay(200); // CMSIS-RTOS v1 uses milliseconds
     MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
     serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+    cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
     osThreadTerminate(defaultTaskHandle);
   /* Infinite loop */
   for(;;)
@@ -276,6 +277,7 @@ void fn(struct mg_connection *c, int ev, void *ev_data) {
       memcpy((char *) buf + n, &r, n + sizeof(r) > len ? len - n : sizeof(r));
     }
   }
+
 
 /* USER CODE END Application */
 

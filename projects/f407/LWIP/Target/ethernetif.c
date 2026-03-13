@@ -778,7 +778,6 @@ void ethernet_link_thread(void* argument)
 
   for(;;)
   {
-	 LAN8742_StartAutoNego(&LAN8742);
   PHYLinkState = LAN8742_GetLinkState(&LAN8742);
 
   if(netif_is_link_up(netif) && (PHYLinkState <= LAN8742_STATUS_LINK_DOWN))

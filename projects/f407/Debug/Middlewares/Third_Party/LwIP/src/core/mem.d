@@ -41,6 +41,7 @@ Middlewares/Third_Party/LwIP/src/core/mem.o: \
  ../Middlewares/Third_Party/LwIP/system/arch/cpu.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/mem.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h \
+ ../Middlewares/Third_Party/LwIP/system/arch/perf.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/sys.h \
  ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h \
  ../Middlewares/Third_Party/LwIP/system/arch/sys_arch.h \
@@ -102,6 +103,7 @@ Middlewares/Third_Party/LwIP/src/core/mem.o: \
 ../Middlewares/Third_Party/LwIP/system/arch/cpu.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/mem.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/def.h:
+../Middlewares/Third_Party/LwIP/system/arch/perf.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/sys.h:
 ../Middlewares/Third_Party/LwIP/src/include/lwip/err.h:
 ../Middlewares/Third_Party/LwIP/system/arch/sys_arch.h:

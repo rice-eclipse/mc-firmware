@@ -16,6 +16,6 @@
 ../LWIP/Target/ethernetif.c:745:9:ETH_PHY_IO_WriteReg	2
 ../LWIP/Target/ethernetif.c:759:9:ETH_PHY_IO_GetTick	1
 ../LWIP/Target/ethernetif.c:768:6:ethernet_link_thread	10
-../LWIP/Target/ethernetif.c:839:6:HAL_ETH_RxAllocateCallback	2
-../LWIP/Target/ethernetif.c:861:6:HAL_ETH_RxLinkCallback	3
-../LWIP/Target/ethernetif.c:898:6:HAL_ETH_TxFreeCallback	1
+../LWIP/Target/ethernetif.c:838:6:HAL_ETH_RxAllocateCallback	2
+../LWIP/Target/ethernetif.c:860:6:HAL_ETH_RxLinkCallback	3
+../LWIP/Target/ethernetif.c:897:6:HAL_ETH_TxFreeCallback	1

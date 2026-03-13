@@ -60,9 +60,9 @@
 /*----- Default Value for TCP_MSS: 536 ---*/
 #define TCP_MSS 1460
 /*----- Default Value for TCP_SND_BUF: 2920 ---*/
-#define TCP_SND_BUF 11680
+#define TCP_SND_BUF 5840
 /*----- Default Value for TCP_SND_QUEUELEN: 17 ---*/
-#define TCP_SND_QUEUELEN 17
+#define TCP_SND_QUEUELEN 16
 /*----- Value in opt.h for LWIP_NETIF_LINK_CALLBACK: 0 -----*/
 #define LWIP_NETIF_LINK_CALLBACK 1
 /*----- Value in opt.h for TCPIP_THREAD_STACKSIZE: 0 -----*/
@@ -86,7 +86,7 @@
 /*----- Value in opt.h for DEFAULT_ACCEPTMBOX_SIZE: 0 -----*/
 #define DEFAULT_ACCEPTMBOX_SIZE 6
 /*----- Value in opt.h for RECV_BUFSIZE_DEFAULT: INT_MAX -----*/
-#define RECV_BUFSIZE_DEFAULT (4*TCP_MSS)
+#define RECV_BUFSIZE_DEFAULT 2000000000
 /*----- Default Value for LWIP_DISABLE_TCP_SANITY_CHECKS: 0 ---*/
 #define LWIP_DISABLE_TCP_SANITY_CHECKS 1
 /*----- Default Value for LWIP_STATS: 0 ---*/

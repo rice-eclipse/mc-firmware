@@ -97,13 +97,6 @@ const osThreadAttr_t cmdHandlingTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
 };
-/* Definitions for collectionTask */
-osThreadId_t collectionTaskHandle;
-const osThreadAttr_t collectionTask_attributes = {
-  .name = "collectionTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
-};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -114,7 +107,6 @@ void mg_random(void *buf, size_t len);
 void StartDefaultTask(void *argument);
 void StartServerTask(void *argument);
 void StartCmdHandlingTask(void *argument);
-void startCollectionTask(void *argument);
 
 extern void MX_LWIP_Init(void);
 extern void MX_USB_DEVICE_Init(void);
@@ -156,9 +148,6 @@ void MX_FREERTOS_Init(void) {
   /* creation of cmdHandlingTask */
   cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
 
-  /* creation of collectionTask */
-  collectionTaskHandle = osThreadNew(startCollectionTask, NULL, &collectionTask_attributes);
-
   /* USER CODE BEGIN RTOS_THREADS */
   /* add threads, ... */
   /* USER CODE END RTOS_THREADS */
@@ -188,12 +177,10 @@ void StartDefaultTask(void *argument)
    while(ip4_addr_isany_val(*netif_ip4_addr(&gnetif)))
   	  osDelay(200); // CMSIS-RTOS v1 uses milliseconds
     MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
-
-
      cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
     serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
-    collectionTaskHandle = osThreadNew(startCollectionTask, NULL, &collectionTask_attributes);
-    	HAL_TIM_Base_Start_IT(&htim14);
+    //collectionTaskHandle = osThreadNew(startCollectionTask, NULL, &collectionTask_attributes);
+    	//HAL_TIM_Base_Start_IT(&htim14);
        HAL_TIM_Base_Start_IT(&htim13);
     osThreadExit();
   /* Infinite loop */
@@ -225,6 +212,9 @@ void StartServerTask(void *argument)
 	//package the data in json for the websocket and send at each sending interval
 		  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 		  if (sending_flag == SEND_NOW){
+			  sprintf(TxBuffer,"sent\r\n");
+			  print_buffer(TxBuffer, strlen(TxBuffer));
+			  /*
 			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
 			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
 			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
@@ -233,7 +223,7 @@ void StartServerTask(void *argument)
 				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 			  }
 			  }
-
+*/
 		  }
     osDelay(1);
   }
@@ -287,40 +277,6 @@ void StartCmdHandlingTask(void *argument)
   /* USER CODE END StartCmdHandlingTask */
 }
 }
-
-/* USER CODE BEGIN Header_startCollectionTask */
-/**
-* @brief Function implementing the collectionTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_startCollectionTask */
-void startCollectionTask(void *argument)
-{
-  /* USER CODE BEGIN startCollectionTask */
-	int sample_count = 0;
-  /* Infinite loop */
-  for(;;)
-  {
-	  osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
-	 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
-	 sample_count = (sample_count + 1) % (sensor_count*2);
-
-	 //First Buffer has been filled
-	 if (sample_count == sensor_count){
-		 //osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
-		 filled_buffer = &sensor_vals[0];
-	 }
-	 //second buffer filled
-	 else if (sample_count == 0){
-		 //osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
-		 filled_buffer = &sensor_vals[sensor_count];
-	 		 }
-  }
-    osDelay(1);
-  }
-  /* USER CODE END startCollectionTask */
-
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
@@ -376,9 +332,10 @@ void fn(struct mg_connection *c, int ev, void *ev_data) {
       HAL_IncTick();
     }
     /* USER CODE BEGIN Callback 1 */
+    /*
     if (htim->Instance == TIM14){
   	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
-    }
+    }*/
     if (htim->Instance == TIM13){
   	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
     }

@@ -7,7 +7,7 @@
 #define MG_STMPACK_ARCH MG_ARCH_NEWLIB
 #endif
 
-#define MG_TCPIP_IP MG_IPV4(192, 168, 0, 121)
+#define MG_TCPIP_IP MG_IPV4(192, 168, 0, 122)
 #define MG_TCPIP_GW MG_IPV4(0, 0, 0, 0)
 #define MG_TCPIP_MASK MG_IPV4(255, 255, 255, 0)
 

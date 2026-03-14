@@ -43,7 +43,7 @@
 #define ETHIF_TX_TIMEOUT (2000U)
 /* USER CODE BEGIN OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Stack size of the interface thread */
-#define INTERFACE_THREAD_STACK_SIZE ( 350 )
+#define INTERFACE_THREAD_STACK_SIZE ( 512 )
 /* USER CODE END OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Network interface name */
 #define IFNAME0 's'
@@ -129,7 +129,6 @@ lan8742_IOCtx_t  LAN8742_IOCtx = {ETH_PHY_IO_Init,
                                   ETH_PHY_IO_GetTick};
 
 /* USER CODE BEGIN 3 */
-
 /* USER CODE END 3 */
 
 /* Private functions ---------------------------------------------------------*/
@@ -256,7 +255,7 @@ static void low_level_init(struct netif *netif)
   memset(&attributes, 0x0, sizeof(osThreadAttr_t));
   attributes.name = "EthIf";
   attributes.stack_size = INTERFACE_THREAD_STACK_SIZE;
-  attributes.priority = osPriorityHigh;
+  attributes.priority = osPriorityRealtime;
   osThreadNew(ethernetif_input, netif, &attributes);
 /* USER CODE END OS_THREAD_NEW_CMSIS_RTOS_V2 */
 
@@ -393,7 +392,11 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
   {
     if(HAL_ETH_Transmit_IT(&heth, &TxConfig) == HAL_OK)
     {
-      errval = ERR_OK;
+    	 if(osSemaphoreAcquire(TxPktSemaphore, ETHIF_TX_TIMEOUT) == osOK)
+    	      {
+    	        HAL_ETH_ReleaseTxPacket(&heth);
+    	        errval = ERR_OK;
+    	      }
     }
     else
     {

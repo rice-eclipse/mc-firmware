@@ -4,4 +4,4 @@
 ../Core/Src/interface.c:350:10:get_mcp3208_adcval	1
 ../Core/Src/interface.c:369:6:filter_and_decimate_interface	1
 ../Core/Src/interface.c:372:5:parse_command_interface	14
-../Core/Src/interface.c:441:6:sensor_message_interface	9
+../Core/Src/interface.c:441:5:sensor_message_interface	9

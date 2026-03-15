@@ -1,7 +1,0 @@
-../Core/Src/freertos.c:120:6:MX_FREERTOS_Init	1
-../Core/Src/freertos.c:168:6:StartDefaultTask	2
-../Core/Src/freertos.c:201:6:StartServerTask	2
-../Core/Src/freertos.c:240:6:StartCmdHandlingTask	4
-../Core/Src/freertos.c:283:6:fn	6
-../Core/Src/freertos.c:317:8:mg_random	3
-../Core/Src/freertos.c:325:8:HAL_TIM_PeriodElapsedCallback	3

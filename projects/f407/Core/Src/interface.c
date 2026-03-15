@@ -438,7 +438,7 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 	}
 
 /*Creates the json string to send over the websocket*/
-void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states){
+int sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states){
 	int json_len = 0;
 	json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "{");
 	// inserts first part of each sensor json file
@@ -491,5 +491,6 @@ void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_va
 	    sprintf(TxBuffer, "Buffer Overflow!\r\n");
 	    print_buffer(TxBuffer, strlen(TxBuffer));
 	}
+	return json_len;
 }
 

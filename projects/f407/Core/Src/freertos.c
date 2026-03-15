@@ -30,6 +30,9 @@
 #include "interface.h"
 #include "tim.h"
 #include "usbd_cdc_if.h"
+#include "lwip/netif.h"
+#include "lwip/ip4_addr.h"
+#include "lan8742.h"
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -42,8 +45,7 @@ typedef struct{
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-#define MAX_CMD_BACKLOG 5
-#define MAX_CMD_BACKLOG 5
+#define MAX_CMD_BACKLOG 10
 #define FIRST_BUF_READY (1 << 0)
 #define SECOND_BUF_READY (1 << 1)
 #define SAMPLE_NOW (1 << 2)
@@ -60,7 +62,6 @@ typedef struct{
 /* USER CODE BEGIN Variables */
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
-
 static char sensor_data_str[4000];
 //Ping-pong buffer for data to write to sd
 float sensor_vals[2*MAX_SENSOR_COUNT];
@@ -97,16 +98,27 @@ const osThreadAttr_t cmdHandlingTask_attributes = {
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
 };
+/* Definitions for collectionTask */
+osThreadId_t collectionTaskHandle;
+const osThreadAttr_t collectionTask_attributes = {
+  .name = "collectionTask",
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityRealtime,
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
+void print_lwip_stats(void);
+void print_link_debug(void);
+
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
 void StartServerTask(void *argument);
 void StartCmdHandlingTask(void *argument);
+void StartCollectionTask(void *argument);
 
 extern void MX_LWIP_Init(void);
 extern void MX_USB_DEVICE_Init(void);
@@ -143,13 +155,16 @@ void MX_FREERTOS_Init(void) {
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 
   /* creation of serverTask */
-  serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
+  //serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
 
   /* creation of cmdHandlingTask */
-  cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+  //cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+
+  /* creation of collectionTask */
+  //collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
 
   /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
+  //debuggingTaskHandle = osThreadNew(StartDebuggingTask, NULL, &debuggingTask_attributes);
   /* USER CODE END RTOS_THREADS */
 
   /* USER CODE BEGIN RTOS_EVENTS */
@@ -175,12 +190,12 @@ void StartDefaultTask(void *argument)
   /* USER CODE BEGIN StartDefaultTask */
   extern struct netif gnetif;
    while(ip4_addr_isany_val(*netif_ip4_addr(&gnetif)))
-  	  osDelay(200); // CMSIS-RTOS v1 uses milliseconds
+  	  osDelay(200);
     MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
-     cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
     serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
-    //collectionTaskHandle = osThreadNew(startCollectionTask, NULL, &collectionTask_attributes);
-    	//HAL_TIM_Base_Start_IT(&htim14);
+     cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
+    collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
+    	HAL_TIM_Base_Start_IT(&htim14);
        HAL_TIM_Base_Start_IT(&htim13);
     osThreadExit();
   /* Infinite loop */
@@ -201,6 +216,7 @@ void StartDefaultTask(void *argument)
 void StartServerTask(void *argument)
 {
   /* USER CODE BEGIN StartServerTask */
+	float *valid_buffer;
 	uint32_t sending_flag;
 	 struct mg_mgr mgr;
 	 mg_mgr_init(&mgr);
@@ -212,19 +228,25 @@ void StartServerTask(void *argument)
 	//package the data in json for the websocket and send at each sending interval
 		  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 		  if (sending_flag == SEND_NOW){
-			  sprintf(TxBuffer,"sent\r\n");
-			  print_buffer(TxBuffer, strlen(TxBuffer));
-			  /*
-			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
-			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
-			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
-			  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-			  if (client->data[0] == 'W'){
-				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+			  valid_buffer = filled_buffer;
+
+			  //ensure the buffer has been filled
+			  if (valid_buffer != NULL){
+				  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
+				  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
+				  int msg_len = sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
+				  if (msg_len > 0 && msg_len < sizeof(sensor_data_str)){
+					  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+						  if (client->data[0] == 'W'){
+							  sprintf(TxBuffer,"sent\r\n");
+							  //print_buffer(TxBuffer, strlen(TxBuffer));
+
+							  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+						  }
+					  }
+				  }
 			  }
-			  }
-*/
-		  }
+		 }
     osDelay(1);
   }
   /* USER CODE END StartServerTask */
@@ -278,9 +300,42 @@ void StartCmdHandlingTask(void *argument)
 }
 }
 
+/* USER CODE BEGIN Header_StartCollectionTask */
+/**
+* @brief Function implementing the collectionTask thread.
+* @param argument: Not used
+* @retval None
+*/
+/* USER CODE END Header_StartCollectionTask */
+void StartCollectionTask(void *argument)
+{
+  /* USER CODE BEGIN StartCollectionTask */
+	int sample_count = 0;
+  /* Infinite loop */
+  for(;;)
+  {
+
+	osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
+	sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
+	sample_count = (sample_count + 1) % (sensor_count*2);
+	if (sample_count == sensor_count){
+	 //osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+	 filled_buffer = &sensor_vals[0];
+	}
+	 //second buffer filled
+	 else if (sample_count == 0){
+		 //osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+		 filled_buffer = &sensor_vals[sensor_count];
+	 }
+    osDelay(1);
+  }
+  /* USER CODE END StartCollectionTask */
+}
+
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
 void fn(struct mg_connection *c, int ev, void *ev_data) {
+
     if (ev == MG_EV_HTTP_MSG){
   	  struct mg_http_message *hm = (struct mg_http_message *) ev_data;
   	  if (mg_match(hm->uri, mg_str("/websocket"), NULL)) {
@@ -296,18 +351,15 @@ void fn(struct mg_connection *c, int ev, void *ev_data) {
         // Got websocket frame. Received data is wm->data.
   	  CMDQUEUE_OBJ_T cmd;
         struct mg_ws_message *wm = (struct mg_ws_message *) ev_data;
-        mg_ws_send(c, wm->data.buf, wm->data.len, WEBSOCKET_OP_TEXT);
         size_t len = wm->data.len;
-		 if (len >= sizeof(cmd.cmd_buf)) {
-			 len = sizeof(cmd.cmd_buf) - 1;
-		 }
+       // mg_ws_send(c, wm->data.buf, wm->data.len, WEBSOCKET_OP_TEXT);
 		 memcpy(cmd.cmd_buf, wm->data.buf, len);
 		 cmd.cmd_buf[len] = '\0';
         cmd.cmd_idx = current_cmd_idx;
-        current_cmd_idx++;
+        //current_cmd_idx++;
         if (current_cmd_idx > MAX_CMD_BACKLOG){
-      	  //trigger shutdown condition
-      	  osMessageQueueReset(cmdMessageQueueHandle);
+      	  //Figure out how to handle this!!
+      	  //osMessageQueueReset(cmdMessageQueueHandle);
         }
         osMessageQueuePut(cmdMessageQueueHandle, &cmd,0U, 0U);
 
@@ -332,10 +384,10 @@ void fn(struct mg_connection *c, int ev, void *ev_data) {
       HAL_IncTick();
     }
     /* USER CODE BEGIN Callback 1 */
-    /*
+
     if (htim->Instance == TIM14){
   	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
-    }*/
+    }
     if (htim->Instance == TIM13){
   	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
     }
@@ -343,5 +395,40 @@ void fn(struct mg_connection *c, int ev, void *ev_data) {
     /* USER CODE END Callback 1 */
   }
 
+  void print_lwip_stats(void) {
+      char buf[256];
+      sprintf(buf, "memp_pbuf_used: %d, avail: %d, mem_err: %d\r\n",
+    		  (unsigned) lwip_stats.memp[MEMP_PBUF_POOL].used,
+    		           (unsigned) lwip_stats.memp[MEMP_PBUF_POOL].avail,
+    		           (unsigned) lwip_stats.memp[MEMP_PBUF_POOL].err);
+      print_buffer(buf, strlen(buf));
+  }
+
+ void print_link_debug(void) {
+	 extern struct netif gnetif;
+	 extern lan8742_Object_t LAN8742;
+      char buf[256];
+      int32_t phy = LAN8742_GetLinkState(&LAN8742);
+
+      const char *phy_str = "UNKNOWN";
+      switch (phy) {
+        case LAN8742_STATUS_LINK_DOWN:           phy_str = "LINK_DOWN"; break;
+        case LAN8742_STATUS_100MBITS_FULLDUPLEX: phy_str = "100FD";     break;
+        case LAN8742_STATUS_100MBITS_HALFDUPLEX: phy_str = "100HD";     break;
+        case LAN8742_STATUS_10MBITS_FULLDUPLEX:  phy_str = "10FD";      break;
+        case LAN8742_STATUS_10MBITS_HALFDUPLEX:  phy_str = "10HD";      break;
+        default: break;
+      }
+
+      snprintf(buf, sizeof(buf),
+               "PHY=%ld (%s), netif_link=%d, netif_up=%d, ip=%s\r\n",
+               (long) phy,
+               phy_str,
+               netif_is_link_up(&gnetif),
+               netif_is_up(&gnetif),
+               ip4addr_ntoa(netif_ip4_addr(&gnetif)));
+
+      CDC_Transmit_FS((uint8_t *) buf, strlen(buf));
+  }
 /* USER CODE END Application */
 

@@ -39,7 +39,7 @@ extern "C" {
 
 /* Exported types ------------------------------------------------------------*/
 #ifndef ETH_TX_DESC_CNT
-#define ETH_TX_DESC_CNT         4U
+#define ETH_TX_DESC_CNT         8U
 #endif /* ETH_TX_DESC_CNT */
 
 #ifndef ETH_RX_DESC_CNT

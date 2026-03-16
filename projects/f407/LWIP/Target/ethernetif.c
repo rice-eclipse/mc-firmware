@@ -33,14 +33,17 @@
 
 /* Within 'USER CODE' section, code will be kept by default at each generation */
 /* USER CODE BEGIN 0 */
-
+char debug_buf[300];
+volatile int tx_busy = 0;
+volatile int tx_callback = 0;
+volatile int rx_err_cnt = 0;
 /* USER CODE END 0 */
 
 /* Private define ------------------------------------------------------------*/
 /* The time to block waiting for input. */
 #define TIME_WAITING_FOR_INPUT ( portMAX_DELAY )
 /* Time to block waiting for transmissions to finish */
-#define ETHIF_TX_TIMEOUT (2000U)
+#define ETHIF_TX_TIMEOUT (1000U)
 /* USER CODE BEGIN OS_THREAD_STACK_SIZE_WITH_RTOS */
 /* Stack size of the interface thread */
 #define INTERFACE_THREAD_STACK_SIZE ( 512 )
@@ -94,7 +97,7 @@ typedef struct
 } RxBuff_t;
 
 /* Memory Pool Declaration */
-#define ETH_RX_BUFFER_CNT             12U
+#define ETH_RX_BUFFER_CNT             16U
 LWIP_MEMPOOL_DECLARE(RX_POOL, ETH_RX_BUFFER_CNT, sizeof(RxBuff_t), "Zero-copy RX PBUF pool");
 
 /* Variable Definitions */
@@ -150,6 +153,8 @@ void HAL_ETH_RxCpltCallback(ETH_HandleTypeDef *handlerEth)
   */
 void HAL_ETH_TxCpltCallback(ETH_HandleTypeDef *handlerEth)
 {
+	tx_callback++;
+
   osSemaphoreRelease(TxPktSemaphore);
 }
 /**
@@ -255,7 +260,7 @@ static void low_level_init(struct netif *netif)
   memset(&attributes, 0x0, sizeof(osThreadAttr_t));
   attributes.name = "EthIf";
   attributes.stack_size = INTERFACE_THREAD_STACK_SIZE;
-  attributes.priority = osPriorityRealtime;
+  attributes.priority = osPriorityHigh2;
   osThreadNew(ethernetif_input, netif, &attributes);
 /* USER CODE END OS_THREAD_NEW_CMSIS_RTOS_V2 */
 
@@ -392,11 +397,7 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
   {
     if(HAL_ETH_Transmit_IT(&heth, &TxConfig) == HAL_OK)
     {
-    	 if(osSemaphoreAcquire(TxPktSemaphore, ETHIF_TX_TIMEOUT) == osOK)
-    	      {
-    	        HAL_ETH_ReleaseTxPacket(&heth);
-    	        errval = ERR_OK;
-    	      }
+      errval = ERR_OK;
     }
     else
     {
@@ -407,6 +408,8 @@ static err_t low_level_output(struct netif *netif, struct pbuf *p)
         osSemaphoreAcquire(TxPktSemaphore, ETHIF_TX_TIMEOUT);
         HAL_ETH_ReleaseTxPacket(&heth);
         errval = ERR_BUF;
+        tx_busy++;
+        rx_err_cnt++;
       }
       else
       {
@@ -436,6 +439,7 @@ static struct pbuf * low_level_input(struct netif *netif)
   {
     HAL_ETH_ReadData(&heth, (void **)&p);
   }
+
 
   return p;
 }
@@ -854,6 +858,7 @@ void HAL_ETH_RxAllocateCallback(uint8_t **buff)
   }
   else
   {
+
     RxAllocStatus = RX_ALLOC_ERROR;
     *buff = NULL;
   }

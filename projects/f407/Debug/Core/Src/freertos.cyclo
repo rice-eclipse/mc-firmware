@@ -1,0 +1,9 @@
+../Core/Src/freertos.c:132:6:MX_FREERTOS_Init	1
+../Core/Src/freertos.c:183:6:StartDefaultTask	2
+../Core/Src/freertos.c:216:6:StartServerTask	7
+../Core/Src/freertos.c:262:6:StartCmdHandlingTask	4
+../Core/Src/freertos.c:309:6:StartCollectionTask	3
+../Core/Src/freertos.c:336:6:fn	4
+../Core/Src/freertos.c:368:8:mg_random	3
+../Core/Src/freertos.c:376:8:HAL_TIM_PeriodElapsedCallback	4
+../Core/Src/freertos.c:398:7:print_link_debug	6

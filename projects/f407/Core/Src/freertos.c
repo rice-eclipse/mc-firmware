@@ -96,14 +96,14 @@ osThreadId_t cmdHandlingTaskHandle;
 const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityHigh1,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for collectionTask */
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
   .name = "collectionTask",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
+  .priority = (osPriority_t) osPriorityHigh1,
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -241,7 +241,7 @@ void StartServerTask(void *argument)
 							  sprintf(TxBuffer,"sent\r\n");
 							  //print_buffer(TxBuffer, strlen(TxBuffer));
 
-							  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+							  mg_ws_send(client, (void *)TxBuffer,strlen(TxBuffer), WEBSOCKET_OP_TEXT);
 						  }
 					  }
 				  }
@@ -299,7 +299,6 @@ void StartCmdHandlingTask(void *argument)
   /* USER CODE END StartCmdHandlingTask */
 }
 }
-
 /* USER CODE BEGIN Header_StartCollectionTask */
 /**
 * @brief Function implementing the collectionTask thread.
@@ -395,14 +394,6 @@ void fn(struct mg_connection *c, int ev, void *ev_data) {
     /* USER CODE END Callback 1 */
   }
 
-  void print_lwip_stats(void) {
-      char buf[256];
-      sprintf(buf, "memp_pbuf_used: %d, avail: %d, mem_err: %d\r\n",
-    		  (unsigned) lwip_stats.memp[MEMP_PBUF_POOL].used,
-    		           (unsigned) lwip_stats.memp[MEMP_PBUF_POOL].avail,
-    		           (unsigned) lwip_stats.memp[MEMP_PBUF_POOL].err);
-      print_buffer(buf, strlen(buf));
-  }
 
  void print_link_debug(void) {
 	 extern struct netif gnetif;

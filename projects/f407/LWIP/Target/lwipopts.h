@@ -53,6 +53,12 @@
 #define MEM_ALIGNMENT 4
 /*----- Default Value for MEM_SIZE: 1600 ---*/
 #define MEM_SIZE 10*1024
+/*----- Default Value for MEMP_OVERFLOW_CHECK: 0 ---*/
+#define MEMP_OVERFLOW_CHECK 1
+/*----- Default Value for MEM_OVERFLOW_CHECK: 0 ---*/
+#define MEM_OVERFLOW_CHECK 1
+/*----- Default Value for MEM_SANITY_CHECK: 0 ---*/
+#define MEM_SANITY_CHECK 1
 /*----- Default Value for PBUF_POOL_BUFSIZE: 592 ---*/
 #define PBUF_POOL_BUFSIZE 1528
 /*----- Value in opt.h for LWIP_ETHERNET: LWIP_ARP || PPPOE_SUPPORT -*/

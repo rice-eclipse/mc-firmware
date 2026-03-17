@@ -48,7 +48,7 @@
 #include "lwip/etharp.h"
 #include "lwip/ip.h"
 #include "lwip/snmp.h"
-
+#include "main.h"
 #include <string.h>
 
 #include "netif/ppp/ppp_opts.h"
@@ -62,6 +62,7 @@
 
 const struct eth_addr ethbroadcast = {{0xff, 0xff, 0xff, 0xff, 0xff, 0xff}};
 const struct eth_addr ethzero = {{0, 0, 0, 0, 0, 0}};
+volatile int eth_output_count;
 
 /**
  * @ingroup lwip_nosys
@@ -272,6 +273,7 @@ ethernet_output(struct netif * netif, struct pbuf * p,
                 u16_t eth_type) {
   struct eth_hdr *ethhdr;
   u16_t eth_type_be = lwip_htons(eth_type);
+  eth_output_count++;
 
 #if ETHARP_SUPPORT_VLAN && defined(LWIP_HOOK_VLAN_SET)
   s32_t vlan_prio_vid = LWIP_HOOK_VLAN_SET(netif, p, src, dst, eth_type);
@@ -310,6 +312,7 @@ ethernet_output(struct netif * netif, struct pbuf * p,
 
   /* send the packet */
   return netif->linkoutput(netif, p);
+
 
 pbuf_header_failed:
   LWIP_DEBUGF(ETHARP_DEBUG | LWIP_DBG_TRACE | LWIP_DBG_LEVEL_SERIOUS,

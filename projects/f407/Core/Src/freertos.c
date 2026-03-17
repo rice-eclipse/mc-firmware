@@ -241,7 +241,7 @@ void StartServerTask(void *argument)
 							  sprintf(TxBuffer,"sent\r\n");
 							  //print_buffer(TxBuffer, strlen(TxBuffer));
 
-							  mg_ws_send(client, (void *)TxBuffer,strlen(TxBuffer), WEBSOCKET_OP_TEXT);
+							  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 						  }
 					  }
 				  }

@@ -463,11 +463,11 @@ int read_file_interface(FIL *target_file, const char *filename, char *data_buffe
 	return read_file(target_file, filename, data_buffer, buffer_size);
 }
 
-int create_file_interface(FIL *target_file, const char *filename){
+int create_file_interface(FIL *target_file, char *filename){
 	return create_file(target_file, filename);
 }
 
-int open_file_interface(FIL *target_file, const char *filename){
+int open_file_interface(FIL *target_file, char *filename){
 		return open_file(target_file, filename);
  }
 
@@ -483,7 +483,9 @@ int close_file_interface(FIL *target_file){
 float get_sensorval_interface(sensor *current_sensor){
 	return get_sensorval(current_sensor);
 }
-
+int gen_filename_interface(char *target_filename,char *config_filename, char *target_type){
+	return gen_filename(target_filename,config_filename, target_type);
+}
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count){
 	return filter_and_decimate(sensor_vals, sensor_count);
 }

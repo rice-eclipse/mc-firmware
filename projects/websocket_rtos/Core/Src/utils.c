@@ -384,7 +384,7 @@ int read_file(FIL *target_file, const char *filename, char *data_buffer, size_t 
 	   return 0;
 }
 
-int create_file(FIL *target_file,const char *filename)
+int create_file(FIL *target_file,char *filename)
 {
     FRESULT fres;
     fres = f_open(target_file, filename, FA_WRITE |FA_CREATE_NEW);
@@ -397,7 +397,7 @@ int create_file(FIL *target_file,const char *filename)
     return 0;
 }
 
-int open_file(FIL *target_file, const char *filename){
+int open_file(FIL *target_file, char *filename){
 	FRESULT fres;
 	fres = f_open(target_file, filename, FA_OPEN_ALWAYS|FA_WRITE);
 	if (fres != FR_OK){
@@ -459,6 +459,29 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
 
 	return dataBuff;
+}
+int gen_filename(char *target_filename,char *config_filename, char *target_type){
+	FILINFO fno;
+	FRESULT fres;
+	fres = f_stat(config_filename, &fno);
+	if (fres != FR_OK){
+		return -1;
+	}
+	int year = ((fno.fdate >> 9) & 0x7F) + 1980;
+	int month = (fno.fdate >> 5) & 0xF;
+	int date = fno.fdate & 0x1F;
+	int hour = (fno.ftime >> 11) & 0x1F;
+	int minute = (fno.ftime >> 5) & 0x3F;
+	int second = ((fno.ftime) & 0x1F) *2;
+
+	int bytes_written;
+	const char *extension = (target_type[0] == 'l') ? ".txt" : ".csv";
+	bytes_written = snprintf(target_filename, MAX_FILENAME_LENGTH, "%s_%d_%d_%d_%d-%d-%d%s", target_type,
+			 month, date, year, hour, minute, second,extension);
+	if (bytes_written < 0 || bytes_written > MAX_FILENAME_LENGTH){
+		return -1;
+	}
+	return 0;
 }
 void filter_and_decimate(float *sensor_vals, int sensor_count){
 	return;

@@ -190,8 +190,8 @@ void StartDefaultTask(void *argument)
    MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
 
    /*Start the timers and the rest of the tasks and creates the necessary files*/\
-   create_file_interface(&data_file,"data.csv");
-   create_file_interface(&log_file,"console.log");
+   create_file_interface(&data_file,data_filename);
+   create_file_interface(&log_file,console_filename);
    collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
   cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
@@ -353,9 +353,9 @@ void StartProcessingTask(void *argument)
 	int sd_card_pos = 0;
 	int log_count = 0;
 	float *current_buffer;
-	open_file_interface(&data_file, "data.csv");
+	open_file_interface(&data_file, data_filename);
 	add_datafile_header();
-	open_file_interface(&log_file, "console.log");
+	open_file_interface(&log_file, console_filename);
 	/*We sync the file to the sd card every second*/
 	int sync_count = 0;
 #ifndef TEST_LOGIC

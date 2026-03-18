@@ -19,9 +19,9 @@ int parse_config_interface(const char *config_str, driver *driver_list,sensor *s
 				 int *driver_count, int *sensor_count, int *monitor_count);
 int read_file_interface(FIL *target_file, const char *filename, char *data_buffer, size_t buffer_size);
 int mount_sd_interface(FATFS* FatFs);
-int open_file_interface(FIL *target_file, const char *filename);
+int open_file_interface(FIL *target_file, char *filename);
 int append_file_interface(FIL *target_file, char *data, UINT btw);
-int create_file_interface(FIL *target_file, const char *filename);
+int create_file_interface(FIL *target_file, char *filename);
 int close_file_interface(FIL *target_file);
 float get_sensorval_interface(sensor *current_sensor);
 int parse_command_interface(const char* json_string, int* driver_id, int* direction, driver *driver_list, int *ignition_flag,
@@ -29,4 +29,5 @@ int parse_command_interface(const char* json_string, int* driver_id, int* direct
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count);
 void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states);
 uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
+int gen_filename_interface(char *target_filename,char *config_filename, char *target_type);
 #endif /* INC_INTERFACE_H_ */

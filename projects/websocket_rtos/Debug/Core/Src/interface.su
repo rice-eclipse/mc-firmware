@@ -7,5 +7,6 @@
 ../Core/Src/interface.c:477:5:mount_sd_interface	16	static
 ../Core/Src/interface.c:480:5:close_file_interface	16	static
 ../Core/Src/interface.c:483:7:get_sensorval_interface	16	static
-../Core/Src/interface.c:487:6:filter_and_decimate_interface	16	static
-../Core/Src/interface.c:495:6:sensor_message_interface	88	static
+../Core/Src/interface.c:486:5:gen_filename_interface	24	static
+../Core/Src/interface.c:489:6:filter_and_decimate_interface	16	static
+../Core/Src/interface.c:497:6:sensor_message_interface	88	static

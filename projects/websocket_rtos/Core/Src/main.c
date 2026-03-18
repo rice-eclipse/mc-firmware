@@ -22,6 +22,7 @@
 #include "fatfs.h"
 #include "lwip.h"
 #include "rng.h"
+#include "rtc.h"
 #include "sdio.h"
 #include "spi.h"
 #include "tim.h"
@@ -61,6 +62,7 @@ static char config_str[4000];
 char rx_buffer[52];
 FATFS FatFs; 	//Fatfs handle
 FIL config_file;
+FILINFO config_file_info;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -75,9 +77,9 @@ void MX_FREERTOS_Init(void);
 int port = 0;
 int sampling_freq_ign = 0;
 int sampling_freq_standby = 0;
-char *console_filename = NULL;
+char console_filename[MAX_FILENAME_LENGTH];
 char cmd_password[MAX_PWD_LENGTH];
-char *data_filename = NULL;
+char data_filename[MAX_FILENAME_LENGTH];
 char *cmd_buffer = NULL;
 char host_ip[MAX_IP_LEN];
 osEventFlagsId_t command_event;
@@ -128,6 +130,7 @@ int main(void)
   MX_SDIO_SD_Init();
   MX_FATFS_Init();
   MX_TIM11_Init();
+  MX_RTC_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
@@ -138,6 +141,9 @@ int main(void)
        parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password, &port, &sampling_freq_ign, &sampling_freq_standby,
      		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
 
+   /*Use the config file modified timestamp to seed the RTC and generate  filenames for logging and data*/
+    gen_filename_interface(data_filename,"config.json", "data");
+    gen_filename_interface(console_filename, "config.json","log");
 
   /* USER CODE END 2 */
 
@@ -169,13 +175,15 @@ void SystemClock_Config(void)
 {
   RCC_OscInitTypeDef RCC_OscInitStruct = {0};
   RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+  RCC_PeriphCLKInitTypeDef PeriphClkInitStruct = {0};
 
   /** Initializes the RCC Oscillators according to the specified parameters
   * in the RCC_OscInitTypeDef structure.
   */
-  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
+  RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI|RCC_OSCILLATORTYPE_LSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
+  RCC_OscInitStruct.LSIState = RCC_LSI_ON;
   RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
   RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
   RCC_OscInitStruct.PLL.PLLM = 13;
@@ -200,11 +208,28 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+  PeriphClkInitStruct.PeriphClockSelection = RCC_PERIPHCLK_RTC;
+  PeriphClkInitStruct.RTCClockSelection = RCC_RTCCLKSOURCE_LSI;
+  if (HAL_RCCEx_PeriphCLKConfig(&PeriphClkInitStruct) != HAL_OK)
+  {
+    Error_Handler();
+  }
 }
 
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
+/**
+  * @brief  Period elapsed callback in non blocking mode
+  * @note   This function is called  when TIM7 interrupt took place, inside
+  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
+  * a global variable "uwTick" used as application time base.
+  * @param  htim : TIM handle
+  * @retval None
+  */
+
+
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None

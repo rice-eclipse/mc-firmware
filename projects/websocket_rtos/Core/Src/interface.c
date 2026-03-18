@@ -486,6 +486,9 @@ float get_sensorval_interface(sensor *current_sensor){
 int gen_filename_interface(char *target_filename,char *config_filename, char *target_type){
 	return gen_filename(target_filename,config_filename, target_type);
 }
+int gen_rtc_start_params_interface(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename){
+	return gen_rtc_start_params(time_field, date_field, config_filename);
+}
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count){
 	return filter_and_decimate(sensor_vals, sensor_count);
 }

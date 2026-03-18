@@ -460,6 +460,22 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 
 	return dataBuff;
 }
+int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename){
+	FILINFO fno;
+		FRESULT fres;
+		fres = f_stat(config_filename, &fno);
+		if (fres != FR_OK){
+			return -1;
+		}
+		date_field->Year = (uint8_t)((fno.fdate >> 9) & 0x7F) -20;
+		date_field->Month = (fno.fdate >> 5) & 0xF;
+		date_field->Date = fno.fdate & 0x1F;
+		time_field->Hours = (fno.ftime >> 11) & 0x1F;
+		time_field->Minutes = (fno.ftime >> 5) & 0x3F;
+		time_field->Seconds = ((fno.ftime) & 0x1F) *2;
+		return 0;
+
+}
 int gen_filename(char *target_filename,char *config_filename, char *target_type){
 	FILINFO fno;
 	FRESULT fres;
@@ -478,9 +494,33 @@ int gen_filename(char *target_filename,char *config_filename, char *target_type)
 	const char *extension = (target_type[0] == 'l') ? ".txt" : ".csv";
 	bytes_written = snprintf(target_filename, MAX_FILENAME_LENGTH, "%s_%d_%d_%d_%d-%d-%d%s", target_type,
 			 month, date, year, hour, minute, second,extension);
-	if (bytes_written < 0 || bytes_written > MAX_FILENAME_LENGTH){
-		return -1;
+	if (bytes_written < 0 || bytes_written >= MAX_FILENAME_LENGTH){
+			return -1;
+		}
+	/*checks if the file already exists and creates a copy if necessary*/
+	fres = f_stat(target_filename, &fno);
+	if (fres == FR_NO_FILE){
+		return 0;
 	}
+	int copy  = 1;
+	while (1){
+		bytes_written = snprintf(target_filename, MAX_FILENAME_LENGTH, "%s_%d_%d_%d_%d-%d-%d_%d%s", target_type,
+					 month, date, year, hour, minute, second,copy,extension);
+		if (bytes_written < 0 || bytes_written > MAX_FILENAME_LENGTH){
+				return -1;
+			}
+		fres = f_stat(target_filename,&fno);
+		if (fres == FR_NO_FILE){
+			return 0;
+		}
+		else if (fres == FR_OK){
+			copy++;
+		}
+		else{
+			return -1;
+		}
+	}
+
 	return 0;
 }
 void filter_and_decimate(float *sensor_vals, int sensor_count){

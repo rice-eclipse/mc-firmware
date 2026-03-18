@@ -63,6 +63,8 @@ char rx_buffer[52];
 FATFS FatFs; 	//Fatfs handle
 FIL config_file;
 FILINFO config_file_info;
+RTC_TimeTypeDef rtc_init_time;
+RTC_DateTypeDef rtc_init_date;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -132,6 +134,10 @@ int main(void)
   MX_TIM11_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  /*initialize the rtc using the last modified date of the config file*/
+  gen_rtc_start_params_interface(&rtc_init_time, &rtc_init_date,"config.json");
+  HAL_RTC_SetTime(&hrtc, &rtc_init_time,RTC_FORMAT_BCD);
+  HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BCD);
   /*Mount the sd card to read information from it*/
   HAL_Delay(1);
   mount_sd_interface(&FatFs);

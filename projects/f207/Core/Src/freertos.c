@@ -66,7 +66,7 @@ float vals_to_send[MAX_SENSOR_COUNT];
 char tx_buffer[300];
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[4096];
-char logging_str[100];
+char data_log[100];
 char data_header_str[300];
 char cmd_str[100];
 FIL data_file;
@@ -293,13 +293,13 @@ void StartProcessingTask(void *argument)
 		  log_count++;
 		  if (log_count == 20){
 			  sprintf(tx_buffer, "sd write\r\n");
-			  sprintf(logging_str,"sd write\r\n");
+			  sprintf(data_log,"sd write\r\n");
 			  HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
 			  log_count = 0;
 
 #ifndef TEST_LOGIC
 			  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
-			  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
+			  fres = append_file_interface(&log_file, data_log, strlen(data_log));
 #endif
 			  sd_card_pos = 0;
 			  memset(sdcard_data, 0, sizeof(sdcard_data));

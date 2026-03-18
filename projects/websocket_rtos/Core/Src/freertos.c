@@ -77,13 +77,19 @@ int driver_states_to_send[MAX_DRIVER_COUNT];
 
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[4096];
-char logging_str[100];
+char data_log[250];
+char cmd_log[400];
 
 //str for data header
 char data_header_str[300];
+//timestamp for logging
+char timestamp[50];
 //log and data file handles
 FIL data_file;
 FIL log_file;
+
+//tracks the number of samples collected
+unsigned long samples_collected;
 
 volatile int stop_logging;
 
@@ -110,8 +116,8 @@ const osThreadAttr_t serverTask_attributes = {
 osThreadId_t cmdHandlingTaskHandle;
 const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
-  .stack_size = 1024 * 4,
-  .priority = (osPriority_t) osPriorityHigh,
+  .stack_size = 256 * 4,
+  .priority = (osPriority_t) osPriorityHigh1,
 };
 /* Definitions for collectionTask */
 osThreadId_t collectionTaskHandle;
@@ -133,6 +139,11 @@ const osThreadAttr_t shutdownTask_attributes = {
   .name = "shutdownTask",
   .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityHigh,
+};
+/* Definitions for loggingMutex */
+osMutexId_t loggingMutexHandle;
+const osMutexAttr_t loggingMutex_attributes = {
+  .name = "loggingMutex"
 };
 
 /* Private function prototypes -----------------------------------------------*/
@@ -159,17 +170,20 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
-	current_cmd_idx = 0;
-	for (int i = 0; i < driver_count; i++){
-		driver_states[i] = 0;
-	}
+
+  /* USER CODE END Init */
+  /* Create the mutex(es) */
+  /* creation of loggingMutex */
+  loggingMutexHandle = osMutexNew(&loggingMutex_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
 	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
   /* USER CODE END RTOS_QUEUES */
+
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -239,6 +253,7 @@ void StartServerTask(void *argument)
 					  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 				  }
 			  }
+
 		  }
 
 	  }
@@ -263,6 +278,7 @@ void StartCmdHandlingTask(void *argument)
 	int actuation_flag;
 	int driver_id;
 	int direction;
+	static char cmd_timestamp[50];
 	CMDQUEUE_OBJ_T cmd;
   /* Infinite loop */
   for(;;)
@@ -272,7 +288,13 @@ void StartCmdHandlingTask(void *argument)
 	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
 	//HAL_UART_Transmit(&huart3, (uint8_t *)cmd.cmd_buf, strlen(cmd.cmd_buf), HAL_MAX_DELAY);
-
+	get_timestamp_interface(cmd_timestamp);
+	sprintf(cmd_log, "%s Received command: %s\r\n",cmd_timestamp, cmd.cmd_buf);
+	osMutexAcquire(loggingMutexHandle, osWaitForever);
+#ifndef TEST_LOGIC
+			  fres = append_file_interface(&log_file, data_log, strlen(data_log));
+#endif
+	osMutexRelease(loggingMutexHandle);
 	if (shutdown_flag == 1){
 		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
 	}
@@ -351,7 +373,6 @@ void StartProcessingTask(void *argument)
 	uint32_t processing_flag;
 	uint32_t stopLogging_flag;
 	int sd_card_pos = 0;
-	int log_count = 0;
 	float *current_buffer;
 	open_file_interface(&data_file, data_filename);
 	add_datafile_header();
@@ -386,54 +407,49 @@ void StartProcessingTask(void *argument)
 
 		  //writes the all the sensor data collected in the current timestep to the sd write buffer
 		  for (int i = 0; i < sensor_count; i++){
-
-			 // sprintf(TxBuffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
-																	   //current_buffer[i]);
-			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
-
 			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f,",current_buffer[i]);
 			  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
-				  //sprintf(TxBuffer, "buffer full!\r\n");
-				  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 				  //drop the data in this cycle
 				  sd_card_pos = 0;
 				  break;
 			  }
 		  }
-
 		  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "\r\n");
 		  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
-				  //sprintf(TxBuffer, "buffer full!\r\n");
-				  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 				  //drop the data in this cycle
 				  sd_card_pos = 0;
 			  }
-		 //write to the sd card after 20 lines have been stored in the buffer
-		  log_count++;
-		  if (log_count == 20){
-			  //sprintf(TxBuffer, "sd write\r\n");
-			  sprintf(logging_str,"sd write\r\n");
-			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), 200);
-			  log_count = 0;
+#ifndef TEST_LOGIC
+		  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
+#endif
+		  //clear the sd write buffer for the next cycle
+		  sd_card_pos = 0;
+		  memset(sdcard_data, 0, sizeof(sdcard_data));
+
+		  //Log whenever 1000 samples have been collected
+		  samples_collected++;
+		  if ((samples_collected % 1000) == 0){
+			  get_timestamp_interface(timestamp);
+			  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
+			  osMutexAcquire(loggingMutexHandle, osWaitForever);
   #ifndef TEST_LOGIC
-			  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
-			  fres = append_file_interface(&log_file, logging_str, strlen(logging_str));
+			  fres = append_file_interface(&log_file, data_log, strlen(data_log));
   #endif
-			  //clear the sd write buffer for the next cycle
-			  sd_card_pos = 0;
-			  memset(sdcard_data, 0, sizeof(sdcard_data));
+			  osMutexRelease(loggingMutexHandle);
+
 		  }
 		  //flush cache back to sd card every second
   sync_count = (sync_count + 1) % sampling_freq_ign;
 		  if (sync_count == 0){
-			  //sprintf(TxBuffer, "synced data\r\n");
-			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		  }
   #ifndef TEST_LOGIC
 		  /*sync data to SD card every second*/
 		  if (sync_count == 0){
 			  f_sync(&data_file);
+
+			  osMutexAcquire(loggingMutexHandle, osWaitForever);
 			  f_sync(&log_file);
+			  osMutexRelease(loggingMutexHandle);
 		  }
 	#endif
 	  }

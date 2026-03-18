@@ -294,7 +294,7 @@
  * a lot of data that needs to be copied, this should be set high.
  */
 #if !defined MEM_SIZE || defined __DOXYGEN__
-#define MEM_SIZE                        1600
+#define MEM_SIZE                        10*1024
 #endif
 
 /**
@@ -1290,7 +1290,7 @@
  * an upper limit on the MSS advertised by the remote host.
  */
 #if !defined TCP_MSS || defined __DOXYGEN__
-#define TCP_MSS                         1072
+#define TCP_MSS                         536
 #endif
 
 /**

@@ -110,6 +110,7 @@
 #define CHECKSUM_CHECK_ICMP 0
 /*----- Value in opt.h for CHECKSUM_CHECK_ICMP6: 1 -----*/
 #define CHECKSUM_CHECK_ICMP6 0
+#define USE_HAL_ETH_REGISTER_CALLBACKS 1
 /*-----------------------------------------------------------------------------*/
 /* USER CODE BEGIN 1 */
 

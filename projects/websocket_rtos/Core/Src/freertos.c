@@ -61,13 +61,7 @@ typedef struct{
 
 /* Private variables ---------------------------------------------------------*/
 /* USER CODE BEGIN Variables */
-static const char *s_listen_on = "http://192.168.0.121";
-static const char *s_web_root = ".";
-static const char *s_ca_path = "ca.pem";
-static const char *s_cert_path = "cert.pem";
-static const char *s_key_path = "key.pem";
 char ip_addr[100];
-struct mg_str s_ca, s_cert, s_key;
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
 
@@ -116,7 +110,7 @@ const osThreadAttr_t serverTask_attributes = {
 osThreadId_t cmdHandlingTaskHandle;
 const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
-  .stack_size = 256 * 4,
+  .stack_size = 1024 * 4,
   .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for collectionTask */
@@ -124,7 +118,7 @@ osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
   .name = "collectionTask",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityHigh1,
+  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for processingTask */
 osThreadId_t processingTaskHandle;
@@ -277,6 +271,7 @@ void StartCmdHandlingTask(void *argument)
 
 	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
+	//HAL_UART_Transmit(&huart3, (uint8_t *)cmd.cmd_buf, strlen(cmd.cmd_buf), HAL_MAX_DELAY);
 
 	if (shutdown_flag == 1){
 		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
@@ -294,12 +289,11 @@ void StartCmdHandlingTask(void *argument)
 
 	}
 	else if (actuation_flag == 1){
-		HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
-		sprintf(TxBuffer, "Actuating Driver %u. Direction: %d", driver_list[driver_id].GPIO_Pin, direction);
-		HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-
-		//TODO: use driver current monitors to verify this
-		driver_states[driver_id] = (direction == 1) ? 1 : 0;
+		if (driver_id >= 0 && driver_id < MAX_DRIVER_COUNT){
+			HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
+			//TODO: use driver current monitors to verify this
+			driver_states[driver_id] = (direction == 1) ? 1 : 0;
+		}
 	}
     osDelay(1);
   }
@@ -393,8 +387,8 @@ void StartProcessingTask(void *argument)
 		  //writes the all the sensor data collected in the current timestep to the sd write buffer
 		  for (int i = 0; i < sensor_count; i++){
 
-			  sprintf(TxBuffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
-																	   current_buffer[i]);
+			 // sprintf(TxBuffer, "Sensor %s value: %f\r\n", sensor_list[i].name,
+																	   //current_buffer[i]);
 			   //HAL_UART_Transmit(&huart3, (uint8_t *)tx_buffer, strlen(tx_buffer), 200);
 
 			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f,",current_buffer[i]);
@@ -432,8 +426,8 @@ void StartProcessingTask(void *argument)
 		  //flush cache back to sd card every second
   sync_count = (sync_count + 1) % sampling_freq_ign;
 		  if (sync_count == 0){
-			  sprintf(TxBuffer, "synced data\r\n");
-			  HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+			  //sprintf(TxBuffer, "synced data\r\n");
+			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 		  }
   #ifndef TEST_LOGIC
 		  /*sync data to SD card every second*/

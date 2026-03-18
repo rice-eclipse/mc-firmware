@@ -41,7 +41,8 @@ Core/Src/utils.o: ../Core/Src/utils.c ../Core/Inc/utils.h \
  ../Middlewares/Third_Party/FatFs/src/diskio.h \
  ../Middlewares/Third_Party/FatFs/src/ff.h \
  ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h \
- ../Core/Inc/cJSON.h ../Core/Inc/usart.h ../Core/Inc/spi.h
+ ../Core/Inc/cJSON.h ../Core/Inc/jsmn.h ../Core/Inc/usart.h \
+ ../Core/Inc/spi.h
 ../Core/Inc/utils.h:
 ../Core/Inc/main.h:
 ../Drivers/STM32F2xx_HAL_Driver/Inc/stm32f2xx_hal.h:
@@ -90,5 +91,6 @@ Core/Src/utils.o: ../Core/Src/utils.c ../Core/Inc/utils.h \
 ../Middlewares/Third_Party/FatFs/src/ff.h:
 ../Middlewares/Third_Party/FatFs/src/drivers/sd_diskio.h:
 ../Core/Inc/cJSON.h:
+../Core/Inc/jsmn.h:
 ../Core/Inc/usart.h:
 ../Core/Inc/spi.h:

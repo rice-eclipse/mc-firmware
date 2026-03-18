@@ -5,6 +5,7 @@
  *      Author: Deepak
  */
 #include "utils.h"
+#include "jsmn.h"
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -251,6 +252,14 @@ end:
     return status;
 }
 
+
+static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
+  if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
+      strncmp(json + tok->start, s, tok->end - tok->start) == 0) {
+    return 0;
+  }
+  return -1;
+}
 int parse_command(const char *json_string, int *driver_id, int *direction, driver *driver_list, int *ignition_flag,
 				  int *shutdown_flag, int *cancel_ignition_flag){
     // CJSON variables to extract the relevant fields
@@ -263,79 +272,101 @@ int parse_command(const char *json_string, int *driver_id, int *direction, drive
     *shutdown_flag = 0;
     *cancel_ignition_flag = 0;
 
-    cJSON *cmd = cJSON_Parse(json_string);
-    if (cmd == NULL) {
-        const char *error_ptr = cJSON_GetErrorPtr();
-        if (error_ptr != NULL) {
-            sprintf(TxBuffer, "Error before: %s\n", error_ptr);
-            HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-        }
-        status = 1;
-        goto end;
-    }
+    jsmn_parser p;
+        jsmntok_t t[64]; // Ensure this is large enough for your expected JSON complexity
 
-    cmd_type = cJSON_GetObjectItemCaseSensitive(cmd, "type");
-    /* If an actuate command is given, parse the target driver and the direction */
-    if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "Actuate") == 0) {
-        drv_id = cJSON_GetObjectItemCaseSensitive(cmd, "driver_id");
-        pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
-        // if the input driver id is valid and the direction is valid, save the id and direction
-        if (cJSON_IsNumber(drv_id) && strcmp(pwd->valuestring, cmd_password) == 0) {
-            dir = cJSON_GetObjectItemCaseSensitive(cmd, "direction");
-            if (cJSON_IsNumber(dir)) {
-                *driver_id = drv_id->valueint;
-                *direction = dir->valueint;
-                HAL_GPIO_WritePin(driver_list[*driver_id].GPIO_Port, driver_list[*driver_id].GPIO_Pin, *direction);
-                status = 0;
-                goto end;
+        jsmn_init(&p);
+        int r = jsmn_parse(&p, json_string, strlen(json_string), t, sizeof(t) / sizeof(t[0]));
+
+        if (r < 0) {
+            sprintf(TxBuffer, "Failed to parse JSON: %d\r\n", r);
+            HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+            return 1;
+        }
+
+        // Assume the top-level element is an object
+        if (r < 1 || t[0].type != JSMN_OBJECT) {
+            return 1;
+        }
+
+        // Token pointers to store the locations of our values
+        jsmntok_t *type_tok = NULL;
+        jsmntok_t *drv_id_tok = NULL;
+        jsmntok_t *val_tok = NULL;
+        int pass_valid = 0;
+
+
+        for (int i = 1; i < r; i += 2) {
+            if (jsoneq(json_string, &t[i], "password") == 0) {
+                if (jsoneq(json_string, &t[i + 1], "quonk") == 0) {
+                    pass_valid = 1;
+                }
+            } else if (jsoneq(json_string, &t[i], "type") == 0) {
+                type_tok = &t[i + 1];
+            } else if (jsoneq(json_string, &t[i], "driver_id") == 0) {
+                drv_id_tok = &t[i + 1];
+            } else if (jsoneq(json_string, &t[i], "value") == 0) {
+                val_tok = &t[i + 1];
+            }
+        }
+
+
+        if (!pass_valid) {
+            sprintf(TxBuffer, "Incorrect Password\r\n");
+            HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+            return 1;
+        }
+
+
+        if (type_tok != NULL) {
+            if (jsoneq(json_string, type_tok, "Actuate") == 0) {
+
+                // Check if we got both driver_id and value tokens
+                if (drv_id_tok != NULL && val_tok != NULL) {
+
+                    // Extract driver_id (copy to temporary buffer to safely use atoi)
+                    char id_str[16] = {0};
+                    int id_len = drv_id_tok->end - drv_id_tok->start;
+                    if (id_len < sizeof(id_str)) {
+                        strncpy(id_str, json_string + drv_id_tok->start, id_len);
+                        *driver_id = atoi(id_str);
+                    } else {
+                        return 1;
+                    }
+
+                    // Extract boolean value (jsmn parses true/false as JSMN_PRIMITIVE)
+                    if (val_tok->type == JSMN_PRIMITIVE) {
+                        if (json_string[val_tok->start] == 't') {
+                            *direction = 1;  // true
+                        } else if (json_string[val_tok->start] == 'f') {
+                            *direction = 0;  // false
+                        } else {
+                            return 1;
+                        }
+                    } else {
+                        return 1;
+                    }
+
+                    *actuation_flag = 1;
+                    status = 0;
+                } else {
+                    status = 1;
+                }
+
+            } else if (jsoneq(json_string, type_tok, "Proxima Ignition") == 0) {
+                *ignition_flag = 1;
+            } else if (jsoneq(json_string, type_tok, "EmergencyStop") == 0) {
+                *shutdown_flag = 1;
+            } else if (jsoneq(json_string, type_tok, "CancelIgnition") == 0) {
+                *cancel_ignition_flag = 1;
             } else {
                 status = 1;
-                goto end;
             }
         } else {
             status = 1;
-            goto end;
         }
-    }
-    else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "Ignition")){
-    	pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
-    	if (strcmp(pwd->valuestring,cmd_password) == 0){
-    		*ignition_flag = 1;
-    		status = 0;
-    		goto end;
-    	} else{
-    		status = 1;
-    		goto end;
-    	}
-    }
-    else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "CancelIgnition")){
-    	pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
-    	if (strcmp(pwd->valuestring, cmd_password) == 0){
-    		*cancel_ignition_flag = 1;
-    		status = 0;
-    		goto end;
-    	} else{
-    		status = 1;
-    		goto end;
-    	}
-    } else if (cJSON_IsString(cmd_type) && strcmp(cmd_type->valuestring, "close")){
-    	pwd = cJSON_GetObjectItemCaseSensitive(cmd, "password");
-		if (strcmp(pwd->valuestring, cmd_password) == 0){
-			*shutdown_flag = 1;
-			status = 0;
-			goto end;
-		} else{
-			status = 1;
-			goto end;
-		}
-    } else{
-    	status = 1;
-    	goto end;
-    }
 
-end:
-    cJSON_Delete(cmd);
-    return status;
+        return status;
 }
 
 /* ========== SD + FILE HELPERS WITH TEST PLACEHOLDERS ========== */

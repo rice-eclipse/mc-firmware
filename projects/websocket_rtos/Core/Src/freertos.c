@@ -117,14 +117,14 @@ osThreadId_t cmdHandlingTaskHandle;
 const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityHigh1,
+  .priority = (osPriority_t) osPriorityHigh,
 };
 /* Definitions for collectionTask */
 osThreadId_t collectionTaskHandle;
 const osThreadAttr_t collectionTask_attributes = {
   .name = "collectionTask",
   .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
+  .priority = (osPriority_t) osPriorityHigh1,
 };
 /* Definitions for processingTask */
 osThreadId_t processingTaskHandle;
@@ -169,51 +169,13 @@ void MX_FREERTOS_Init(void) {
 	for (int i = 0; i < driver_count; i++){
 		driver_states[i] = 0;
 	}
-  /* USER CODE END Init */
-
-  /* USER CODE BEGIN RTOS_MUTEX */
-  /* add mutexes, ... */
-  /* USER CODE END RTOS_MUTEX */
-
-  /* USER CODE BEGIN RTOS_SEMAPHORES */
-  /* add semaphores, ... */
-  /* USER CODE END RTOS_SEMAPHORES */
-
-  /* USER CODE BEGIN RTOS_TIMERS */
-  /* start timers, add new ones, ... */
-  /* USER CODE END RTOS_TIMERS */
 
   /* USER CODE BEGIN RTOS_QUEUES */
 	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
   /* USER CODE END RTOS_QUEUES */
-
   /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-  /* creation of serverTask */
-  //serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
-
-  /* creation of cmdHandlingTask */
-  //cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
-
-  /* creation of collectionTask */
-  //collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
-
-  /* creation of processingTask */
-  //processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
-
-  /* creation of shutdownTask */
-  //shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
-
-  /* USER CODE BEGIN RTOS_THREADS */
-  /* add threads, ... */
-  /* USER CODE END RTOS_THREADS */
-
-  /* USER CODE BEGIN RTOS_EVENTS */
-  /* add events, ... */
-  /* USER CODE END RTOS_EVENTS */
-
 }
 
 /* USER CODE BEGIN Header_StartDefaultTask */
@@ -274,12 +236,14 @@ void StartServerTask(void *argument)
 	  //package the data in json for the websocket and send at each sending interval
 	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 	  if (sending_flag == SEND_NOW){
-		  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
-		  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
-		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
-		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-			  if (client->data[0] == 'W'){
-				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+		  if (filled_buffer != NULL){
+			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
+			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
+			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
+			  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+				  if (client->data[0] == 'W'){
+					  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+				  }
 			  }
 		  }
 

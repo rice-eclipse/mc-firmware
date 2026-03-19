@@ -52,6 +52,7 @@ typedef struct{
 #define LOGGING_STOPPED (1 << 4)
 #define STOP_LOGGING (1 << 5)
 #define SEND_NOW (1 << 7)
+#define BUFFER_CONSUMED (1 << 8)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -80,7 +81,8 @@ char sdcard_data[4096];
 char data_log[250];
 char cmd_log[400];
 
-//str for data header
+//str for data header and logging each line
+char line_buf[300];
 char data_header_str[300];
 //timestamp for logging
 char timestamp[50];
@@ -91,7 +93,8 @@ FIL log_file;
 //tracks the number of samples collected
 unsigned long samples_collected;
 
-volatile int stop_logging;
+//Once collection task finishes the burst tw buffers it must wait for processing task
+volatile int first_pass_completed;
 
 osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
@@ -102,7 +105,7 @@ const osMessageQueueAttr_t cmdMessageQueue_attributes = {
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for serverTask */
@@ -116,7 +119,7 @@ const osThreadAttr_t serverTask_attributes = {
 osThreadId_t cmdHandlingTaskHandle;
 const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
 };
 /* Definitions for collectionTask */
@@ -145,6 +148,11 @@ osMutexId_t loggingMutexHandle;
 const osMutexAttr_t loggingMutex_attributes = {
   .name = "loggingMutex"
 };
+/* Definitions for driversMutex */
+osMutexId_t driversMutexHandle;
+const osMutexAttr_t driversMutex_attributes = {
+  .name = "driversMutex"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -159,7 +167,8 @@ void StartCmdHandlingTask(void *argument);
 void StartCollectionTask(void *argument);
 void StartProcessingTask(void *argument);
 void StartShutdownTask(void *argument);
-
+void vApplicationStackOverflowHook( TaskHandle_t xTask,
+                                    char *pcTaskName );
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -170,23 +179,22 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
   */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
+	samples_collected = 0;
+	first_pass_completed = 0;
 
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
   loggingMutexHandle = osMutexNew(&loggingMutex_attributes);
-
   /* USER CODE BEGIN RTOS_QUEUES */
-	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
-  /* USER CODE END RTOS_QUEUES */
-
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-
-}
+ 	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
+   /* USER CODE END RTOS_QUEUES */
+  /* creation of driversMutex */
+  driversMutexHandle = osMutexNew(&driversMutex_attributes);
 
 /* USER CODE BEGIN Header_StartDefaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+}
 /**
   * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
@@ -246,7 +254,11 @@ void StartServerTask(void *argument)
 	  if (sending_flag == SEND_NOW){
 		  if (filled_buffer != NULL){
 			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
+
+			  osMutexAcquire(driversMutexHandle, 100U);
 			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
+			  osMutexRelease(driversMutexHandle);
+
 			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
 			  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 				  if (client->data[0] == 'W'){
@@ -280,6 +292,9 @@ void StartCmdHandlingTask(void *argument)
 	int direction;
 	static char cmd_timestamp[50];
 	CMDQUEUE_OBJ_T cmd;
+#ifndef TEST_LOGIC
+	FRESULT fres;
+#endif
   /* Infinite loop */
   for(;;)
   {
@@ -288,11 +303,11 @@ void StartCmdHandlingTask(void *argument)
 	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
 	//HAL_UART_Transmit(&huart3, (uint8_t *)cmd.cmd_buf, strlen(cmd.cmd_buf), HAL_MAX_DELAY);
-	get_timestamp_interface(cmd_timestamp);
+	get_timestamp_interface(cmd_timestamp, 50);
 	sprintf(cmd_log, "%s Received command: %s\r\n",cmd_timestamp, cmd.cmd_buf);
 	osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
-			  fres = append_file_interface(&log_file, data_log, strlen(data_log));
+			  fres = append_file_interface(&log_file, cmd_log, strlen(cmd_log));
 #endif
 	osMutexRelease(loggingMutexHandle);
 	if (shutdown_flag == 1){
@@ -314,7 +329,17 @@ void StartCmdHandlingTask(void *argument)
 		if (driver_id >= 0 && driver_id < MAX_DRIVER_COUNT){
 			HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
 			//TODO: use driver current monitors to verify this
+			osMutexAcquire(driversMutexHandle, osWaitForever);
 			driver_states[driver_id] = (direction == 1) ? 1 : 0;
+			osMutexRelease(driversMutexHandle);
+
+			get_timestamp_interface(cmd_timestamp,50);
+			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
+				osMutexAcquire(loggingMutexHandle, osWaitForever);
+#ifndef TEST_LOGIC
+			  fres = append_file_interface(&log_file, cmd_log, strlen(cmd_log));
+#endif
+	osMutexRelease(loggingMutexHandle);
 		}
 	}
     osDelay(1);
@@ -338,6 +363,7 @@ void StartCollectionTask(void *argument)
   for(;;)
   {
 	   osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
+
 		 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
 		 			  //sprintf(TxBuffer,"recorded val: %f\r\n", sensor_vals[sample_count]);
 		 			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -353,6 +379,7 @@ void StartCollectionTask(void *argument)
 		 else if (sample_count == 0){
 			 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 			 filled_buffer = &sensor_vals[sensor_count];
+			 first_pass_completed = 1;
 		 }
 
     osDelay(1);
@@ -379,6 +406,7 @@ void StartProcessingTask(void *argument)
 	open_file_interface(&log_file, console_filename);
 	/*We sync the file to the sd card every second*/
 	int sync_count = 0;
+	int log_count =0;
 #ifndef TEST_LOGIC
 	FRESULT fres;
 #endif
@@ -401,35 +429,42 @@ void StartProcessingTask(void *argument)
 		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
 	  }
 	  //perform filtering and decimation and log data to sd card
+
 	  else{
 		  filter_and_decimate_interface(current_buffer, sensor_count);
-		  sdcard_data[0] = '\0';
-
-		  //writes the all the sensor data collected in the current timestep to the sd write buffer
+		  int line_len = 0;
+		  //writes the all the sensor data collected in the current timestep to the line buffer
 		  for (int i = 0; i < sensor_count; i++){
-			  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "%.3f,",current_buffer[i]);
-			  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
-				  //drop the data in this cycle
-				  sd_card_pos = 0;
-				  break;
-			  }
+			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",current_buffer[i]);
 		  }
-		  sd_card_pos += snprintf(sdcard_data + sd_card_pos, sizeof(sdcard_data)-sd_card_pos, "\r\n");
-		  if (sd_card_pos < 0 || sd_card_pos >= sizeof(sdcard_data)){
-				  //drop the data in this cycle
-				  sd_card_pos = 0;
+		  //signal to the collection task that it has consumed a buffer
+		  osThreadFlagsSet(collectionTaskHandle,BUFFER_CONSUMED);
+		  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
+		  //only add the new line if it doesn't cause an overflow
+		  if (sd_card_pos+line_len < sizeof(sdcard_data)){
+			  memcpy(sdcard_data+sd_card_pos, line_buf, line_len);
+			  sd_card_pos += line_len;
+			  log_count++;
+			  samples_collected++;
 			  }
+		  //otherwise, we just write what we have to the sd card first
+		  else{
+			  log_count = 20;
+		  }
+		  if (log_count == 20){
+		  osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
 		  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
 #endif
+		  osMutexRelease(loggingMutexHandle);
 		  //clear the sd write buffer for the next cycle
 		  sd_card_pos = 0;
-		  memset(sdcard_data, 0, sizeof(sdcard_data));
-
+		  log_count = 0;
+	  }
 		  //Log whenever 1000 samples have been collected
-		  samples_collected++;
+
 		  if ((samples_collected % 1000) == 0){
-			  get_timestamp_interface(timestamp);
+			  get_timestamp_interface(timestamp, 50);
 			  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
 			  osMutexAcquire(loggingMutexHandle, osWaitForever);
   #ifndef TEST_LOGIC
@@ -438,20 +473,17 @@ void StartProcessingTask(void *argument)
 			  osMutexRelease(loggingMutexHandle);
 
 		  }
-		  //flush cache back to sd card every second
-  sync_count = (sync_count + 1) % sampling_freq_ign;
+		  //flush cache back to sd card every 10 seconds
+  sync_count = (sync_count + 1) % (10*sampling_freq_ign);
 		  if (sync_count == 0){
 		  }
+		  osMutexAcquire(loggingMutexHandle, osWaitForever);
   #ifndef TEST_LOGIC
 		  /*sync data to SD card every second*/
-		  if (sync_count == 0){
 			  f_sync(&data_file);
-
-			  osMutexAcquire(loggingMutexHandle, osWaitForever);
 			  f_sync(&log_file);
-			  osMutexRelease(loggingMutexHandle);
-		  }
 	#endif
+		  osMutexRelease(loggingMutexHandle);
 	  }
     osDelay(1);
   }
@@ -500,6 +532,14 @@ void StartShutdownTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
+
+void vApplicationStackOverflowHook( TaskHandle_t xTask,
+                                    char *pcTaskName ){
+	sprintf(TxBuffer, "%s\r\n", pcTaskName);
+	 HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+}
+
 static void fn(struct mg_connection *c, int ev, void *ev_data) {
   if (ev == MG_EV_HTTP_MSG){
 	  struct mg_http_message *hm = (struct mg_http_message *) ev_data;

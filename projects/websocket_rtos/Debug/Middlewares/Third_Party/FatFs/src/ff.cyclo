@@ -31,8 +31,6 @@
 ../Middlewares/Third_Party/FatFs/src/ff.c:1648:9:dir_register	16
 ../Middlewares/Third_Party/FatFs/src/ff.c:1726:9:dir_remove	7
 ../Middlewares/Third_Party/FatFs/src/ff.c:1773:6:get_fileinfo	17
-../Middlewares/Third_Party/FatFs/src/ff.c:1843:7:get_achar	4
-../Middlewares/Third_Party/FatFs/src/ff.c:1865:5:pattern_matching	15
 ../Middlewares/Third_Party/FatFs/src/ff.c:1913:9:create_name	44
 ../Middlewares/Third_Party/FatFs/src/ff.c:2125:9:follow_path	10
 ../Middlewares/Third_Party/FatFs/src/ff.c:2187:5:get_ldnumber	8
@@ -49,8 +47,6 @@
 ../Middlewares/Third_Party/FatFs/src/ff.c:3260:9:f_opendir	13
 ../Middlewares/Third_Party/FatFs/src/ff.c:3316:9:f_closedir	4
 ../Middlewares/Third_Party/FatFs/src/ff.c:3348:9:f_readdir	7
-../Middlewares/Third_Party/FatFs/src/ff.c:3390:9:f_findnext	7
-../Middlewares/Third_Party/FatFs/src/ff.c:3416:9:f_findfirst	2
 ../Middlewares/Third_Party/FatFs/src/ff.c:3442:9:f_stat	6
 ../Middlewares/Third_Party/FatFs/src/ff.c:3477:9:f_getfree	14
 ../Middlewares/Third_Party/FatFs/src/ff.c:3544:9:f_truncate	16

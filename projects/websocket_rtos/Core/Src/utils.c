@@ -523,6 +523,22 @@ int gen_filename(char *target_filename,char *config_filename, char *target_type)
 
 	return 0;
 }
+
+int get_timestamp(char *timestamp_str, int timestamp_str_size){
+	RTC_TimeTypeDef sTime;
+	RTC_DateTypeDef sDate;
+	HAL_StatusTypeDef status;
+	status = HAL_RTC_GetTime(&hrtc,&sTime, RTC_FORMAT_BIN);
+	status |= HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
+	if (status != HAL_OK){
+		return -1;
+	}
+	snprintf(timestamp_str, timestamp_str_size,
+			"%d-%d-%d %d:%d:%d", sDate.Year, sDate.Month,sDate.Date,
+			sTime.Hours, sTime.Minutes, sTime.Seconds);
+
+
+}
 void filter_and_decimate(float *sensor_vals, int sensor_count){
 	return;
 }

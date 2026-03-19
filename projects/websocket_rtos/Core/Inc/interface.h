@@ -31,5 +31,6 @@ void filter_and_decimate_interface(float *sensor_vals, int sensor_count);
 void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_vals, int *driver_states);
 uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
 int gen_rtc_start_params_interface(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename);
+int get_timestamp_interface(char *timestamp_str, int timestamp_str_size);
 int gen_filename_interface(char *target_filename,char *config_filename, char *target_type);
 #endif /* INC_INTERFACE_H_ */

@@ -11,5 +11,6 @@
 ../Core/Src/utils.c:444:10:get_mcp3208_adcval	1
 ../Core/Src/utils.c:463:5:gen_rtc_start_params	2
 ../Core/Src/utils.c:479:5:gen_filename	10
-../Core/Src/utils.c:526:6:filter_and_decimate	1
-../Core/Src/utils.c:530:6:ignition_sequence	1
+../Core/Src/utils.c:527:5:get_timestamp	2
+../Core/Src/utils.c:542:6:filter_and_decimate	1
+../Core/Src/utils.c:546:6:ignition_sequence	1

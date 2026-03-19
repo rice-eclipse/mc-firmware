@@ -9,5 +9,6 @@
 ../Core/Src/interface.c:483:7:get_sensorval_interface	1
 ../Core/Src/interface.c:486:5:gen_filename_interface	1
 ../Core/Src/interface.c:489:5:gen_rtc_start_params_interface	1
-../Core/Src/interface.c:492:6:filter_and_decimate_interface	1
-../Core/Src/interface.c:500:6:sensor_message_interface	9
+../Core/Src/interface.c:492:5:get_timestamp_interface	1
+../Core/Src/interface.c:496:6:filter_and_decimate_interface	1
+../Core/Src/interface.c:504:6:sensor_message_interface	9

@@ -489,6 +489,10 @@ int gen_filename_interface(char *target_filename,char *config_filename, char *ta
 int gen_rtc_start_params_interface(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename){
 	return gen_rtc_start_params(time_field, date_field, config_filename);
 }
+int get_timestamp_interface(char *timestamp_str, int timestamp_str_size){
+	return get_timestamp(timestamp_str, timestamp_str_size);
+}
+
 void filter_and_decimate_interface(float *sensor_vals, int sensor_count){
 	return filter_and_decimate(sensor_vals, sensor_count);
 }

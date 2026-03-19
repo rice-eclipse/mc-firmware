@@ -460,23 +460,29 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 
 	return dataBuff;
 }
-int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename){
+int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, const char *config_filename){
 	FILINFO fno;
 		FRESULT fres;
 		fres = f_stat(config_filename, &fno);
 		if (fres != FR_OK){
 			return -1;
 		}
-		date_field->Year = (uint8_t)((fno.fdate >> 9) & 0x7F) -20;
+		int year = ((fno.fdate >> 9) & 0x7F) +1980;
+		date_field->Year = (uint8_t)(year-2000);
 		date_field->Month = (fno.fdate >> 5) & 0xF;
 		date_field->Date = fno.fdate & 0x1F;
+		date_field->WeekDay = RTC_WEEKDAY_MONDAY;
+
 		time_field->Hours = (fno.ftime >> 11) & 0x1F;
 		time_field->Minutes = (fno.ftime >> 5) & 0x3F;
 		time_field->Seconds = ((fno.ftime) & 0x1F) *2;
+		 time_field->DayLightSaving = RTC_DAYLIGHTSAVING_NONE;
+		 time_field->StoreOperation = RTC_STOREOPERATION_RESET;
+
 		return 0;
 
 }
-int gen_filename(char *target_filename,char *config_filename, char *target_type){
+int gen_filename(char *target_filename,const char *config_filename, char *target_type){
 	FILINFO fno;
 	FRESULT fres;
 	fres = f_stat(config_filename, &fno);
@@ -528,14 +534,19 @@ int get_timestamp(char *timestamp_str, int timestamp_str_size){
 	RTC_TimeTypeDef sTime;
 	RTC_DateTypeDef sDate;
 	HAL_StatusTypeDef status;
+	int str_len;
 	status = HAL_RTC_GetTime(&hrtc,&sTime, RTC_FORMAT_BIN);
 	status |= HAL_RTC_GetDate(&hrtc, &sDate, RTC_FORMAT_BIN);
 	if (status != HAL_OK){
 		return -1;
 	}
-	snprintf(timestamp_str, timestamp_str_size,
+	str_len = snprintf(timestamp_str, timestamp_str_size,
 			"%d-%d-%d %d:%d:%d", sDate.Year, sDate.Month,sDate.Date,
 			sTime.Hours, sTime.Minutes, sTime.Seconds);
+	if (str_len > timestamp_str_size){
+		return -1;
+	}
+	return 0;
 
 
 }

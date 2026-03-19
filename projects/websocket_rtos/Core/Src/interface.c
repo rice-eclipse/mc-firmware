@@ -483,10 +483,10 @@ int close_file_interface(FIL *target_file){
 float get_sensorval_interface(sensor *current_sensor){
 	return get_sensorval(current_sensor);
 }
-int gen_filename_interface(char *target_filename,char *config_filename, char *target_type){
+int gen_filename_interface(char *target_filename,const char *config_filename, char *target_type){
 	return gen_filename(target_filename,config_filename, target_type);
 }
-int gen_rtc_start_params_interface(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename){
+int gen_rtc_start_params_interface(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, const char *config_filename){
 	return gen_rtc_start_params(time_field, date_field, config_filename);
 }
 int get_timestamp_interface(char *timestamp_str, int timestamp_str_size){

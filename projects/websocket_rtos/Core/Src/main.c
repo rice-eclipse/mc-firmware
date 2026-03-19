@@ -65,6 +65,7 @@ FIL config_file;
 FILINFO config_file_info;
 RTC_TimeTypeDef rtc_init_time;
 RTC_DateTypeDef rtc_init_date;
+int time_set_res;
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -134,13 +135,18 @@ int main(void)
   MX_TIM11_Init();
   MX_RTC_Init();
   /* USER CODE BEGIN 2 */
+  /*Mount the sd card to read information from it*/
+   HAL_Delay(1);
+   mount_sd_interface(&FatFs);
   /*initialize the rtc using the last modified date of the config file*/
   gen_rtc_start_params_interface(&rtc_init_time, &rtc_init_date,"config.json");
-  HAL_RTC_SetTime(&hrtc, &rtc_init_time,RTC_FORMAT_BCD);
-  HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BCD);
-  /*Mount the sd card to read information from it*/
-  HAL_Delay(1);
-  mount_sd_interface(&FatFs);
+  time_set_res = HAL_RTC_SetTime(&hrtc, &rtc_init_time,RTC_FORMAT_BIN);
+  time_set_res |= HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BIN);
+  if (time_set_res != HAL_OK){
+	  sprintf(TxBuffer, "Error in setting up rtc");
+	  HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+  }
+
 
   /*parse the configuration file to get the available sensors and drivers */
   read_file_interface(&config_file, "config.json", config_str,4000);

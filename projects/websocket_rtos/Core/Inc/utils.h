@@ -30,8 +30,8 @@ int append_file(FIL *target_file, char *data, UINT btw);
 int mount_sd(FATFS* FatFs);
 int close_file(FIL *target_file);
 float get_sensorval(sensor *current_sensor);
-int gen_filename(char *target_filename,char *config_filename, char *target_type);
-int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, char *config_filename);
+int gen_filename(char *target_filename,const char *config_filename, char *target_type);
+int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, const char *config_filename);
 int get_timestamp(char *timestamp_str, int timestamp_str_size);
 uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHandle);
 /*TODO: Need to implement filtering and decimation */

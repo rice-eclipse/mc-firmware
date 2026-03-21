@@ -436,7 +436,7 @@ int close_file(FIL *target_file){
 float get_sensorval(sensor *current_sensor){
 	static uint16_t adc_val = 0;
 	//uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
-	adc_val = (adc_val + 10) % 200;
+	adc_val = (adc_val + 10) % 200; //what am I doing here
 	float voltage = (adc_val)*4.096/4096;
 	float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
 	return sensor_val;
@@ -453,8 +453,8 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	tx[2] = 0x00;
 
 	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_RESET);
-	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
+	HAL_SPI_TransmitReceive_IT(spiHandle, tx, rx, 3);
+	//HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
 
 	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
 

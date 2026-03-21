@@ -80,6 +80,7 @@ void MX_FREERTOS_Init(void);
 int port = 0;
 int sampling_freq_ign = 0;
 int sampling_freq_standby = 0;
+int decimation_factor = 0;
 char console_filename[MAX_FILENAME_LENGTH];
 char cmd_password[MAX_PWD_LENGTH];
 char data_filename[MAX_FILENAME_LENGTH];
@@ -152,7 +153,7 @@ int main(void)
   read_file_interface(&config_file, "config.json", config_str,4000);
        parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password, &port, &sampling_freq_ign, &sampling_freq_standby,
      		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
-
+     decimation_factor = sampling_freq_ign/sampling_freq_standby;
    /*Use the config file modified timestamp to seed the RTC and generate  filenames for logging and data*/
     gen_filename_interface(data_filename,"config.json", "data");
     gen_filename_interface(console_filename, "config.json","log");
@@ -232,14 +233,6 @@ void SystemClock_Config(void)
 
 /* USER CODE END 4 */
 
-/**
-  * @brief  Period elapsed callback in non blocking mode
-  * @note   This function is called  when TIM7 interrupt took place, inside
-  * HAL_TIM_IRQHandler(). It makes a direct call to HAL_IncTick() to increment
-  * a global variable "uwTick" used as application time base.
-  * @param  htim : TIM handle
-  * @retval None
-  */
 /**
   * @brief  This function is executed in case of error occurrence.
   * @retval None

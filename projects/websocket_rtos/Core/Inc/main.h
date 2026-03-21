@@ -70,7 +70,6 @@ typedef struct{
 #define MAX_PWD_LENGTH 15
 #define MAX_FILENAME_LENGTH 50
 
-
 extern sensor sensor_list[MAX_SENSOR_COUNT];
 extern driver driver_list[MAX_DRIVER_COUNT];
 extern monitor monitor_list[MAX_MONITOR_COUNT];
@@ -80,6 +79,7 @@ extern char cmd_password[MAX_PWD_LENGTH];
 extern int port;
 extern int sampling_freq_ign;
 extern int sampling_freq_standby;
+extern int decimation_factor;
 extern char *cmd_buffer;
 extern char console_filename[MAX_FILENAME_LENGTH];
 extern char data_filename[MAX_FILENAME_LENGTH];

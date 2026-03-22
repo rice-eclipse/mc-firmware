@@ -531,11 +531,7 @@ void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_va
 	        }
 	    }
 	    // Add closing bracket for readings array and closing brace for sensor group
-	    if (i < 2) {
-	        json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "]},");
-	    } else {
-	        json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "]},");
-	    }
+	    json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "]},");
 	}
 
 	// inserts drivers

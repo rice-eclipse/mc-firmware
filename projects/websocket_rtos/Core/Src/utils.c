@@ -110,15 +110,14 @@ int parse_config(const char *config_str,
 
 						switch (cs_pin){
 						case 1:
-							new_sensor.adc_cs = 1;
+							new_sensor.adc_cs = ADC1_CS_Pin;
 							break;
 						case 2:
-							new_sensor.adc_cs = 1;
-							break;
+							new_sensor.adc_cs = ADC2_CS_Pin;
 							break;
 						//need to do some error handling here
 						default:
-							new_sensor.adc_cs = 1;
+							new_sensor.adc_cs = ADC1_CS_Pin;
 							break;
 						}
 
@@ -218,19 +217,7 @@ int parse_config(const char *config_str,
 		                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_intercept")->valuedouble;
 		                new_monitor.calibration_slope =
 		                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_slope")->valuedouble;
-
-		                switch (cs_pin){
-							case 1:
-								new_monitor.adc_cs =1;
-								break;
-							case 2:
-								new_monitor.adc_cs = 1;
-								break;
-							//need to do some error handling here
-							default:
-								new_monitor.adc_cs = 1;
-								break;
-							}
+		                new_monitor.adc_cs = ADC3_CS_Pin;
 		                monitor_list[curr_monitor] = new_monitor;
 		                curr_monitor++;
 		            }
@@ -293,9 +280,9 @@ int parse_command(const char *json_string, int *driver_id, int *direction, drive
 
 		    // 1. Check Password
 		    if (!pass_valid) {
-		        sprintf(TxBuffer, "Incorrect Password\r\n");
-		        HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-		        return 1;
+		        //sprintf(TxBuffer, "Incorrect Password\r\n");
+		        //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		        return -1;
 		    }
 		    if (type_tok != NULL) {
 		        if (jsoneq(json_string, type_tok, "Actuate") == 0) {

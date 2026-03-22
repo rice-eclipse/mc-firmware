@@ -135,6 +135,8 @@ int main(void)
   MX_FATFS_Init();
   MX_TIM11_Init();
   MX_RTC_Init();
+  MX_SPI2_Init();
+  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
    HAL_Delay(1);
@@ -153,6 +155,7 @@ int main(void)
   read_file_interface(&config_file, "config.json", config_str,4000);
        parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password, &port, &sampling_freq_ign, &sampling_freq_standby,
      		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
+
      decimation_factor = sampling_freq_ign/sampling_freq_standby;
    /*Use the config file modified timestamp to seed the RTC and generate  filenames for logging and data*/
     gen_filename_interface(data_filename,"config.json", "data");

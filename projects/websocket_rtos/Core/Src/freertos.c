@@ -52,7 +52,11 @@ typedef struct{
 #define LOGGING_STOPPED (1 << 4)
 #define STOP_LOGGING (1 << 5)
 #define SEND_NOW (1 << 7)
-#define BUFFER_CONSUMED (1 << 8)
+//flags for the sending task
+#define ACTUATED (1 << 8)
+#define INCORRECT_PASSWORD (1 << 9)
+#define IGNITION_COUNT (1 << 10)
+#define IGNITION_IP (1 << 11)
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -65,7 +69,7 @@ typedef struct{
 char ip_addr[100];
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
-static char sensor_data_str[4000];
+static char sensor_data_str[1072];
 //Ping-pong buffer for data to write to sd
 uint16_t sensor_vals[2*MAX_SENSOR_COUNT];
 int driver_states[MAX_DRIVER_COUNT];
@@ -86,12 +90,12 @@ uint8_t rx[3];
 int decimation_count;
 
 //stores the sensor values in a single string to write to the sd card
-char sdcard_data[4096];
+char sdcard_data[3072];
 char data_log[250];
 char cmd_log[400];
 
 //str for data header and logging each line
-char line_buf[300];
+char line_buf[160];
 char data_header_str[300];
 //timestamp for logging
 char timestamp[50];
@@ -99,22 +103,22 @@ char timestamp[50];
 FIL data_file;
 FIL log_file;
 
+//ignition counter
+int ignition_count;
 //tracks the number of samples collected
 unsigned long samples_collected;
-
-//Once collection task finishes the burst tw buffers it must wait for processing task
-volatile int first_pass_completed;
-
 osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
   .name = "cmdMessageQueue"
 };
+
+osTimerId_t ignition_timer;
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 512 * 4,
+  .stack_size = 256 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for serverTask */
@@ -156,11 +160,13 @@ const osMutexAttr_t driversMutex_attributes = {
   .name = "driversMutex"
 };
 
+
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
 void add_datafile_header();
+static void ignition_timer_Callback(void *argument);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -180,23 +186,27 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 	samples_collected = 0;
-	first_pass_completed = 0;
 	sample_count = 0;
 	decimation_count = 0;
+	ignition_count = 10;
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
   loggingMutexHandle = osMutexNew(&loggingMutex_attributes);
+
   /* creation of driversMutex */
   driversMutexHandle = osMutexNew(&driversMutex_attributes);
 
   /* USER CODE BEGIN RTOS_QUEUES */
  	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
   /* USER CODE END RTOS_QUEUES */
+
+  /* Create the thread(s) */
   /* creation of defaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
 }
 
+/* USER CODE BEGIN Header_StartDefaultTask */
 /**
   * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
@@ -212,13 +222,14 @@ void StartDefaultTask(void *argument)
   while(ip4_addr_isany_val(*netif_ip4_addr(&gnetif)))
  	  osDelay(200);
    MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
-   /*Start the timers and the rest of the tasks and creates the necessary files*/\
+   /*Start the timers and the rest of the tasks and creates the necessary files*/
    create_file_interface(&data_file,data_filename);
    create_file_interface(&log_file,console_filename);
   cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
   processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
   shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
+  ignition_timer = osTimerNew(ignition_timer_Callback, osTimerOnce,NULL, NULL);
    HAL_TIM_Base_Start_IT(&htim14);
    HAL_TIM_Base_Start_IT(&htim13);
    osThreadExit();
@@ -250,22 +261,45 @@ void StartServerTask(void *argument)
   {
 	  mg_mgr_poll(&mgr, 10);
 	  //package the data in json for the websocket and send at each sending interval
-	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
-	  if (sending_flag == SEND_NOW){
+	  sending_flag = osThreadFlagsWait((SEND_NOW|ACTUATED|INCORRECT_PASSWORD|IGNITION_IP|IGNITION_COUNT), osFlagsWaitAny, 0);
+	  if ((sending_flag & SEND_NOW) != 0){
 		  if (filled_buffer != NULL){
 			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
 
 			  osMutexAcquire(driversMutexHandle, 100U);
 			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
 			  osMutexRelease(driversMutexHandle);
-
 			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
 			  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 				  if (client->data[0] == 'W'){
 					  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 				  }
 			  }
-
+		  }
+	  }
+	  if ((sending_flag & (ACTUATED|INCORRECT_PASSWORD)) != 0){
+		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+			  if (client->data[0] == 'W'){
+				  //shitty solution to avoid sending the timestamp as well lol.
+				  mg_ws_send(client, (void *)(cmd_log+50),strlen(cmd_log)-50, WEBSOCKET_OP_TEXT);
+			  }
+		  }
+	  }
+	  if ((sending_flag &IGNITION_COUNT) != 0){
+		  sprintf(TxBuffer, "IGNITION in %d\r\n", ignition_count);
+		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+		  			  if (client->data[0] == 'W'){
+		  				  mg_ws_send(client, (void *)TxBuffer,strlen(TxBuffer), WEBSOCKET_OP_TEXT);
+		  			  }
+		  		  }
+		  osTimerStart(ignition_timer, 1000U);
+	  }
+	  if ((sending_flag & IGNITION_IP) != 0){
+		  sprintf(TxBuffer, "IGNITION in Progress!\r\n");
+		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+			  if (client->data[0] == 'W'){
+				  mg_ws_send(client, (void *)TxBuffer,strlen(TxBuffer), WEBSOCKET_OP_TEXT);
+			  }
 		  }
 
 	  }
@@ -299,11 +333,15 @@ void StartCmdHandlingTask(void *argument)
   for(;;)
   {
 	osMessageQueueGet(cmdMessageQueueHandle, &cmd, NULL, osWaitForever);
-
-	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
+	get_timestamp_interface(cmd_timestamp, 50);
+	int result = parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
 	//HAL_UART_Transmit(&huart3, (uint8_t *)cmd.cmd_buf, strlen(cmd.cmd_buf), HAL_MAX_DELAY);
-	get_timestamp_interface(cmd_timestamp, 50);
+	if (result == -1){
+		sprintf(cmd_log, "%s Incorrect password\r\n", cmd_timestamp);
+		osThreadFlagsSet(serverTaskHandle, INCORRECT_PASSWORD);
+		continue;
+	}
 	sprintf(cmd_log, "%s Received command: %s\r\n",cmd_timestamp, cmd.cmd_buf);
 	osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
@@ -315,13 +353,12 @@ void StartCmdHandlingTask(void *argument)
 	}
 	if (stop_ignition_flag == 1){
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+		osTimerStop(ignition_timer);
 	}
 	else if (ignition_flag == 1){
-		//ignition_sequence();
-		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
+		//Ignition timer
+		osTimerStart(ignition_timer, 1000U);
 		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
-		//start shutdown timer after ignition
-		HAL_TIM_Base_Start_IT(&htim11);
 	}
 	else if (actuation_flag == 1){
 		if (driver_id >= 0 && driver_id < MAX_DRIVER_COUNT){
@@ -331,7 +368,6 @@ void StartCmdHandlingTask(void *argument)
 			driver_states[driver_id] = (direction == 1) ? 1 : 0;
 			osMutexRelease(driversMutexHandle);
 
-			get_timestamp_interface(cmd_timestamp,50);
 			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
 				osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
@@ -419,7 +455,6 @@ void StartProcessingTask(void *argument)
 			  log_count = 0;
 		  }
 			  //Log whenever 1000 samples have been collected
-
 			  if ((samples_collected % 1000) == 0){
 				  get_timestamp_interface(timestamp, 50);
 				  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
@@ -428,7 +463,6 @@ void StartProcessingTask(void *argument)
 				  fres = append_file_interface(&log_file, data_log, strlen(data_log));
   #endif
 				  osMutexRelease(loggingMutexHandle);
-
 			  	  }
 		  //flush cache back to sd card every 10 seconds
 	  sync_count = (sync_count + 1) % (10*sampling_freq_ign);
@@ -480,6 +514,9 @@ void StartShutdownTask(void *argument)
 	  	}
 	  	if (cmdHandlingTaskHandle != NULL){
 	  		osThreadTerminate(cmdHandlingTaskHandle);
+	  	}
+	  	if (ignition_timer != NULL){
+	  		osTimerDelete(ignition_timer);
 	  	}
 	  	sprintf(TxBuffer, "All tasks closed\r\n");
 	  	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -567,7 +604,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	  	//don't care
 	  	tx[2] = 0x00;
 
-	  	HAL_GPIO_WritePin(GPIOC,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
+	  	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
 	  	HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
   }
   if (htim->Instance == TIM13){
@@ -584,7 +621,7 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 	if (hspi->Instance == SPI1){
-		HAL_GPIO_WritePin(GPIOC,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_SET);
+		HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_SET);
 		sensor_vals[sample_count] = ((rx[1] & 0xF) << 8) | rx[2];
 		sample_count = (sample_count + 1) % (sensor_count*2);
 
@@ -597,7 +634,16 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 			filled_buffer = &sensor_vals[sensor_count];
 		}
+	}
+}
 
+static void ignition_timer_Callback(void *argument){
+	if (ignition_count > 0){
+		osThreadFlagsSet(serverTaskHandle, IGNITION_COUNT);
+		ignition_count--;
+	}
+	else if (ignition_count == 0){
+		osThreadFlagsSet(serverTaskHandle, IGNITION_IP);
 	}
 }
 void add_datafile_header(){

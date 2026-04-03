@@ -399,9 +399,9 @@ Shutdown should be deterministic and should not depend on ambiguous shared flags
 ## Recommended implementation order
 
 ### Phase 1: decouple raw acquisition from transport
-- Remove raw-buffer reads from `serverTask`.
-- Add a processed telemetry snapshot.
-- Make `serverTask` send only from that snapshot.
+- Remove raw-buffer reads from `serverTask`. <Done>
+- Add a processed telemetry snapshot. <Done>
+- Make `serverTask` send only from that snapshot. <Done>
 
 ### Phase 2: implement CIC / decimation
 - Add CIC processing in `processingTask`.

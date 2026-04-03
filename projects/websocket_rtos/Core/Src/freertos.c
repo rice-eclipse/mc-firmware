@@ -40,6 +40,9 @@ typedef struct{
 } CMDQUEUE_OBJ_T;
 
 typedef struct{
+	char telem_buf[100];
+} TELEMQUEUE_OBJ_T;
+typedef struct{
 	float cal_sensor_vals[MAX_SENSOR_COUNT];
 	int driver_states[MAX_DRIVER_COUNT];
 } telemetry_snapshot_t;
@@ -56,11 +59,7 @@ typedef struct{
 #define LOGGING_STOPPED (1 << 4)
 #define STOP_LOGGING (1 << 5)
 #define SEND_NOW (1 << 7)
-//flags for the sending task
-#define ACTUATED (1 << 8)
-#define INCORRECT_PASSWORD (1 << 9)
-#define IGNITION_COUNT (1 << 10)
-#define IGNITION_IP (1 << 11)
+
 
 #define DECIMATED_LOGGING_FACTOR 10
 #define DECIMATED_TELEMETRY_FACTOR 100
@@ -104,6 +103,7 @@ char sdcard_data[3072];
 char data_log[250];
 char cmd_log[400];
 
+
 //str for data header and logging each line
 char line_buf[0];
 char data_header_str[300];
@@ -120,6 +120,10 @@ unsigned long samples_collected;
 osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
   .name = "cmdMessageQueue"
+};
+osMessageQueueId_t telemMessageQueueHandle;
+const osMessageQueueAttr_t telemMessageQueue_attributes = {
+  .name = "telemMessageQueue"
 };
 
 osTimerId_t ignition_timer;
@@ -199,8 +203,6 @@ void MX_FREERTOS_Init(void) {
 	sample_count = 0;
 	decimation_count = 0;
 	ignition_count = 10;
-
-
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
@@ -211,6 +213,7 @@ void MX_FREERTOS_Init(void) {
 
   /* USER CODE BEGIN RTOS_QUEUES */
  	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
+ 	telemMessageQueueHandle = osMessageQueueNew(15, sizeof(TELEMQUEUE_OBJ_T), &telemMessageQueue_attributes);
   /* USER CODE END RTOS_QUEUES */
 
   /* Create the thread(s) */
@@ -263,7 +266,9 @@ void StartDefaultTask(void *argument)
 void StartServerTask(void *argument)
 {
   /* USER CODE BEGIN StartServerTask */
+	TELEMQUEUE_OBJ_T telem;
 	sprintf(ip_addr, "http://%s:%d",host_ip,port);
+	osStatus_t telem_queue_status;
 	uint32_t sending_flag;
 	 struct mg_mgr mgr;
 	  mg_mgr_init(&mgr);
@@ -273,42 +278,21 @@ void StartServerTask(void *argument)
   {
 	  mg_mgr_poll(&mgr, 10);
 	  //package the data in json for the websocket and send at each sending interval
-	  sending_flag = osThreadFlagsWait((SEND_NOW|ACTUATED|INCORRECT_PASSWORD|IGNITION_IP|IGNITION_COUNT), osFlagsWaitAny, 0);
+	  sending_flag = osThreadFlagsWait((SEND_NOW), osFlagsWaitAny, 0);
+
 	  if ((sending_flag & SEND_NOW) != 0){
+		  //check if there is a telemetry messsage to send along with the data snapshot
+		  telem_queue_status = osMessageQueueGet(telemMessageQueueHandle, &telem, NULL, 0);
 		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),
 				  telem_snapshot.cal_sensor_vals,telem_snapshot.driver_states);
 		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 			  if (client->data[0] == 'W'){
 				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+				  if (telem_queue_status == osOK){
+					 mg_ws_send(client, (void *)telem.telem_buf,strlen(telem.telem_buf), WEBSOCKET_OP_TEXT);
+				 }
 			  }
 		  }
-
-	  }
-	  if ((sending_flag & (ACTUATED|INCORRECT_PASSWORD)) != 0){
-		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-			  if (client->data[0] == 'W'){
-				  //shitty solution to avoid sending the timestamp as well lol.
-				  mg_ws_send(client, (void *)(cmd_log+50),strlen(cmd_log)-50, WEBSOCKET_OP_TEXT);
-			  }
-		  }
-	  }
-	  if ((sending_flag &IGNITION_COUNT) != 0){
-		  sprintf(TxBuffer, "IGNITION in %d\r\n", ignition_count);
-		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-		  			  if (client->data[0] == 'W'){
-		  				  mg_ws_send(client, (void *)TxBuffer,strlen(TxBuffer), WEBSOCKET_OP_TEXT);
-		  			  }
-		  		  }
-		  osTimerStart(ignition_timer, 1000U);
-	  }
-	  if ((sending_flag & IGNITION_IP) != 0){
-		  sprintf(TxBuffer, "IGNITION in Progress!\r\n");
-		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-			  if (client->data[0] == 'W'){
-				  mg_ws_send(client, (void *)TxBuffer,strlen(TxBuffer), WEBSOCKET_OP_TEXT);
-			  }
-		  }
-
 	  }
     osDelay(1);
   }
@@ -333,6 +317,7 @@ void StartCmdHandlingTask(void *argument)
 	int direction;
 	static char cmd_timestamp[50];
 	CMDQUEUE_OBJ_T cmd;
+	TELEMQUEUE_OBJ_T telem;
 #ifndef TEST_LOGIC
 	FRESULT fres;
 #endif
@@ -346,7 +331,8 @@ void StartCmdHandlingTask(void *argument)
 	//HAL_UART_Transmit(&huart3, (uint8_t *)cmd.cmd_buf, strlen(cmd.cmd_buf), HAL_MAX_DELAY);
 	if (result == -1){
 		sprintf(cmd_log, "%s Incorrect password\r\n", cmd_timestamp);
-		osThreadFlagsSet(serverTaskHandle, INCORRECT_PASSWORD);
+		sprintf(telem.telem_buf, "Incorrect password\r\n");
+		osMessageQueuePut(telemMessageQueueHandle, &telem, 0U,0U);
 		continue;
 	}
 	sprintf(cmd_log, "%s Received command: %s\r\n",cmd_timestamp, cmd.cmd_buf);
@@ -374,13 +360,14 @@ void StartCmdHandlingTask(void *argument)
 			osMutexAcquire(driversMutexHandle, osWaitForever);
 			driver_states[driver_id] = (direction == 1) ? 1 : 0;
 			osMutexRelease(driversMutexHandle);
-
 			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
+			sprintf(telem.telem_buf,"Actuating driver id %d - %d\r\n", driver_list[driver_id].GPIO_Pin, direction);
 				osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
 			  fres = append_file_interface(&log_file, cmd_log, strlen(cmd_log));
 #endif
 	osMutexRelease(loggingMutexHandle);
+	osMessageQueuePut(telemMessageQueueHandle, &telem, 0U,0U);
 		}
 	}
     osDelay(1);
@@ -444,7 +431,7 @@ void StartProcessingTask(void *argument)
 		  		 }
 		  		line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
 		  		 //only add the new line if it doesn't cause an overflow
-				  if (sd_card_pos+line_len < sizeof(sdcard_data)){
+				  if (sd_card_pos+line_len <= sizeof(sdcard_data)){
 					  memcpy(sdcard_data+sd_card_pos, line_buf, line_len);
 					  sd_card_pos += line_len;
 					  log_count++;
@@ -656,12 +643,17 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 }
 
 static void ignition_timer_Callback(void *argument){
+	TELEMQUEUE_OBJ_T ign_telem;
 	if (ignition_count > 0){
-		osThreadFlagsSet(serverTaskHandle, IGNITION_COUNT);
+		sprintf(ign_telem.telem_buf, "IGNITION in %d\r\n", ignition_count);
+		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 		ignition_count--;
+		osTimerStart(ignition_timer, 1000U);
 	}
 	else if (ignition_count == 0){
-		osThreadFlagsSet(serverTaskHandle, IGNITION_IP);
+		HAL_GPIO_WritePin(IGN_GPIO_Port, IGN_Pin, GPIO_PIN_SET);
+		sprintf(ign_telem.telem_buf,"IGNITION IN PROGRESS\r\n");
+		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 	}
 }
 void add_datafile_header(){

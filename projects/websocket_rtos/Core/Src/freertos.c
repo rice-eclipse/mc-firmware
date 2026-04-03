@@ -39,6 +39,10 @@ typedef struct{
 	uint8_t cmd_idx;
 } CMDQUEUE_OBJ_T;
 
+typedef struct{
+	float cal_sensor_vals[MAX_SENSOR_COUNT];
+	int driver_states[MAX_DRIVER_COUNT];
+} telemetry_snapshot_t;
 
 /* USER CODE END PTD */
 
@@ -57,6 +61,9 @@ typedef struct{
 #define INCORRECT_PASSWORD (1 << 9)
 #define IGNITION_COUNT (1 << 10)
 #define IGNITION_IP (1 << 11)
+
+#define DECIMATED_LOGGING_FACTOR 10
+#define DECIMATED_TELEMETRY_FACTOR 100
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -73,13 +80,15 @@ static char sensor_data_str[1072];
 //Ping-pong buffer for data to write to sd
 uint16_t sensor_vals[2*MAX_SENSOR_COUNT];
 int driver_states[MAX_DRIVER_COUNT];
-//the snapshot of sensor vals to send to mission control
+telemetry_snapshot_t telem_snapshot;
+
+//stores the filtered and decimated outputs and the calibrated values respectively
+uint16_t decimated_sensor_vals[MAX_SENSOR_COUNT];
+float calibrated_sensor_vals[MAX_SENSOR_COUNT];
+
 //pointer to the 'last filled buffer'
 uint16_t *filled_buffer;
-/*Make vals to long and vals to send the same*/
-float vals_to_log[MAX_SENSOR_COUNT];
-float vals_to_send[MAX_SENSOR_COUNT];
-int driver_states_to_send[MAX_DRIVER_COUNT];
+/*Make vals to log and vals to send the same*/
 /*Current sample in the current sampling cycle*/
 int sample_count;
 //tx and rx buffers for ADC sample retrieval
@@ -87,7 +96,8 @@ uint8_t tx[3];
 uint8_t rx[3];
 
 //decimation count for the CIC filter
-int decimation_count;
+uint32_t decimation_count;
+
 
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[3072];
@@ -95,7 +105,7 @@ char data_log[250];
 char cmd_log[400];
 
 //str for data header and logging each line
-char line_buf[160];
+char line_buf[0];
 char data_header_str[300];
 //timestamp for logging
 char timestamp[50];
@@ -189,6 +199,8 @@ void MX_FREERTOS_Init(void) {
 	sample_count = 0;
 	decimation_count = 0;
 	ignition_count = 10;
+
+
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
@@ -263,19 +275,14 @@ void StartServerTask(void *argument)
 	  //package the data in json for the websocket and send at each sending interval
 	  sending_flag = osThreadFlagsWait((SEND_NOW|ACTUATED|INCORRECT_PASSWORD|IGNITION_IP|IGNITION_COUNT), osFlagsWaitAny, 0);
 	  if ((sending_flag & SEND_NOW) != 0){
-		  if (filled_buffer != NULL){
-			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
-
-			  osMutexAcquire(driversMutexHandle, 100U);
-			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
-			  osMutexRelease(driversMutexHandle);
-			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
-			  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-				  if (client->data[0] == 'W'){
-					  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
-				  }
+		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),
+				  telem_snapshot.cal_sensor_vals,telem_snapshot.driver_states);
+		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+			  if (client->data[0] == 'W'){
+				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 			  }
 		  }
+
 	  }
 	  if ((sending_flag & (ACTUATED|INCORRECT_PASSWORD)) != 0){
 		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
@@ -424,57 +431,69 @@ void StartProcessingTask(void *argument)
 	  //perform filtering and decimation and log data to sd card
 	  else{
 		  /*TODO: implement filtering and decimation*/
-		  //filter_and_decimate_interface(current_buffer, sensor_count);
-			  int line_len = 0;
-			  //convert the decimated data to a float and write to a line buffer
-			  for (int i = 0; i < sensor_count; i++){
-				  float voltage_val = current_buffer[i]*4096/4096;
-				  float calibrated_val = (voltage_val*sensor_list[i].calibration_slope) + sensor_list[i].calibration_int;
-				  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_val);
-			  }
-			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
-			  //only add the new line if it doesn't cause an overflow
-			  if (sd_card_pos+line_len < sizeof(sdcard_data)){
-				  memcpy(sdcard_data+sd_card_pos, line_buf, line_len);
-				  sd_card_pos += line_len;
-				  log_count++;
-				  samples_collected++;
+		  	/***Raw sampling buffer is now decoupled from processing **/
+		  	 if (decimation_count == DECIMATED_LOGGING_FACTOR){
+		  		 memcpy(decimated_sensor_vals,current_buffer,sensor_count*sizeof(uint16_t));
+		  		int line_len = 0;
+		  		get_timestamp_interface(timestamp,50);
+		  		line_len+= snprintf(line_buf, sizeof(line_buf),"%s,",timestamp);
+		  		 for (int i = 0; i < sensor_count; i++){
+		  			float voltage_val = decimated_sensor_vals[i]*4096/4096;
+		  			 calibrated_sensor_vals[i] = voltage_val*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
+		  			line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_sensor_vals[i]);
+		  		 }
+		  		line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
+		  		 //only add the new line if it doesn't cause an overflow
+				  if (sd_card_pos+line_len < sizeof(sdcard_data)){
+					  memcpy(sdcard_data+sd_card_pos, line_buf, line_len);
+					  sd_card_pos += line_len;
+					  log_count++;
+					  samples_collected++;
+					  }
+				  //otherwise, we just write what we have to the sd card first
+				  else{
+					  log_count = 20;
 				  }
-			  //otherwise, we just write what we have to the sd card first
-			  else{
-				  log_count = 20;
-			  }
-			  if (log_count == 20){
-			  osMutexAcquire(loggingMutexHandle, osWaitForever);
-#ifndef TEST_LOGIC
-			  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
-#endif
-			  osMutexRelease(loggingMutexHandle);
-			  //clear the sd write buffer for the next cycle
-			  sd_card_pos = 0;
-			  log_count = 0;
-		  }
-			  //Log whenever 1000 samples have been collected
-			  if ((samples_collected % 1000) == 0){
-				  get_timestamp_interface(timestamp, 50);
-				  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
+				  if (log_count == 20){
+					  osMutexAcquire(loggingMutexHandle, osWaitForever);
+		#ifndef TEST_LOGIC
+					  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
+		#endif
+					  osMutexRelease(loggingMutexHandle);
+					  //clear the sd write buffer for the next cycle
+					  sd_card_pos = 0;
+					  log_count = 0;
+				  }
+				  //Log whenever 1000 samples have been collected
+				  if ((samples_collected % 1000) == 0){
+						  get_timestamp_interface(timestamp, 50);
+						  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
+						  osMutexAcquire(loggingMutexHandle, osWaitForever);
+		  #ifndef TEST_LOGIC
+						  fres = append_file_interface(&log_file, data_log, strlen(data_log));
+		  #endif
+						  osMutexRelease(loggingMutexHandle);
+						  }
+			  //flush cache back to sd card every 10 seconds
+		  sync_count = (sync_count + DECIMATED_LOGGING_FACTOR) % (10*sampling_freq_ign);
+				  if (sync_count == 0){
+				  }
 				  osMutexAcquire(loggingMutexHandle, osWaitForever);
-  #ifndef TEST_LOGIC
-				  fres = append_file_interface(&log_file, data_log, strlen(data_log));
-  #endif
+	  #ifndef TEST_LOGIC
+			  /*sync data to SD card every second*/
+				  f_sync(&data_file);
+				  f_sync(&log_file);
+		#endif
 				  osMutexRelease(loggingMutexHandle);
-			  	  }
-		  //flush cache back to sd card every 10 seconds
-	  sync_count = (sync_count + 1) % (10*sampling_freq_ign);
-			  if (sync_count == 0){
-			  }
-			  osMutexAcquire(loggingMutexHandle, osWaitForever);
-  #ifndef TEST_LOGIC
-		  /*sync data to SD card every second*/
-			  f_sync(&data_file);
-			  f_sync(&log_file);
-	#endif
-			  osMutexRelease(loggingMutexHandle);
+
+		  		 if (decimation_count == DECIMATED_TELEMETRY_FACTOR){
+		  			 memcpy(telem_snapshot.cal_sensor_vals, calibrated_sensor_vals, sensor_count*sizeof(float));
+		  			 osMutexAcquire(driversMutexHandle, 100U);
+		  			 memcpy(telem_snapshot.driver_states, driver_states, driver_count*sizeof(int));
+		  			 osMutexRelease(driversMutexHandle);
+		  		 }
+		  	 }
+
 	 }
 	  osDelay(1);
   }
@@ -597,11 +616,8 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   /*Sampling timer: collects the data from the ADC*/
   if (htim->Instance == TIM14){
 	  int curr_channel = sensor_list[sample_count%sensor_count].channel;
-	  	//start + single-ended + D2
 	  	tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
-	  	//D1 + D0 shifted to B7 and B6
 	  	tx[1] = (curr_channel & 0x03) << 6;
-	  	//don't care
 	  	tx[2] = 0x00;
 
 	  	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
@@ -629,10 +645,12 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 		if (sample_count == sensor_count){
 			osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
 			filled_buffer = &sensor_vals[0];
+			decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		}
 		else if (sample_count == 0){
 			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 			filled_buffer = &sensor_vals[sensor_count];
+			decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		}
 	}
 }

@@ -85,8 +85,7 @@ telemetry_snapshot_t telem_snapshot;
 uint16_t decimated_sensor_vals[MAX_SENSOR_COUNT];
 float calibrated_sensor_vals[MAX_SENSOR_COUNT];
 
-//pointer to the 'last filled buffer'
-uint16_t *filled_buffer;
+
 /*Make vals to log and vals to send the same*/
 /*Current sample in the current sampling cycle*/
 int sample_count;
@@ -631,12 +630,10 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 		//notify processing task if either of the ping pong buffers is full
 		if (sample_count == sensor_count){
 			osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
-			filled_buffer = &sensor_vals[0];
 			decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		}
 		else if (sample_count == 0){
 			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
-			filled_buffer = &sensor_vals[sensor_count];
 			decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		}
 	}

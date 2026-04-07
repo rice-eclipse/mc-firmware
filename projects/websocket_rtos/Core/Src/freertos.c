@@ -104,7 +104,7 @@ char cmd_log[400];
 
 
 //str for data header and logging each line
-char line_buf[0];
+char line_buf[300];
 char data_header_str[300];
 //timestamp for logging
 char timestamp[50];
@@ -656,6 +656,7 @@ static void ignition_timer_Callback(void *argument){
 void add_datafile_header(){
 	int card_pos = 0;
 	data_header_str[0] = '\0';
+	card_pos += snprintf(data_header_str+card_pos, sizeof(data_header_str) - card_pos, "time,");
 	for (int i = 0; i < sensor_count; i++){
 		card_pos += snprintf(data_header_str+card_pos,sizeof(data_header_str) - card_pos,"%s,",
 							 sensor_list[i].name);

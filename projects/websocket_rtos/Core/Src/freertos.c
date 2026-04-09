@@ -474,28 +474,19 @@ void StartProcessingTask(void *argument)
 					  sd_card_pos = 0;
 					  log_count = 0;
 				  }
-				  //Log whenever 1000 samples have been collected
+				  //Log whenever 1000 samples have been collected and sync to sd card
 				  if ((samples_collected % 1000) == 0){
 						  get_timestamp_interface(timestamp, 50);
 						  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
 						  osMutexAcquire(loggingMutexHandle, osWaitForever);
 		  #ifndef TEST_LOGIC
 						  fres = append_file_interface(&log_file, data_log, strlen(data_log));
+						  f_sync(&data_file);
+						  f_sync(&log_file);
 		  #endif
 						  osMutexRelease(loggingMutexHandle);
 						  }
-			  //flush cache back to sd card every 10 seconds
-		  sync_count = (sync_count + DECIMATED_LOGGING_FACTOR) % (10*sampling_freq_ign);
-				  if (sync_count == 0){
-				  }
-				  osMutexAcquire(loggingMutexHandle, osWaitForever);
-	  #ifndef TEST_LOGIC
-			  /*sync data to SD card every second*/
-				  f_sync(&data_file);
-				  f_sync(&log_file);
-		#endif
-				  osMutexRelease(loggingMutexHandle);
-
+				  //idk if we want to add another filter for this
 		  		 if (decimation_count == DECIMATED_TELEMETRY_FACTOR){
 		  			 memcpy(telem_snapshot.cal_sensor_vals, calibrated_sensor_vals, sensor_count*sizeof(float));
 		  			 osMutexAcquire(driversMutexHandle, 100U);

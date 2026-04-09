@@ -61,8 +61,10 @@ typedef struct{
 #define SEND_NOW (1 << 7)
 
 
-#define DECIMATED_LOGGING_FACTOR 10
-#define DECIMATED_TELEMETRY_FACTOR 100
+#define DECIMATED_LOGGING_FACTOR 8
+//Three stage CIC filter
+#define GAIN_COMP 9
+#define DECIMATED_TELEMETRY_FACTOR 104
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -81,9 +83,7 @@ uint16_t sensor_vals[2*MAX_SENSOR_COUNT];
 int driver_states[MAX_DRIVER_COUNT];
 telemetry_snapshot_t telem_snapshot;
 
-//stores the filtered and decimated outputs and the calibrated values respectively
-uint16_t decimated_sensor_vals[MAX_SENSOR_COUNT];
-float calibrated_sensor_vals[MAX_SENSOR_COUNT];
+
 
 
 /*Make vals to log and vals to send the same*/
@@ -93,9 +93,16 @@ int sample_count;
 uint8_t tx[3];
 uint8_t rx[3];
 
-//decimation count for the CIC filter
-uint32_t decimation_count;
+//decimation count for the CIC filter and the buffers for all the stages
+int decimation_count;
+uint32_t integrator_1[MAX_SENSOR_COUNT];
+uint32_t integrator_2[MAX_SENSOR_COUNT];
+uint32_t integrator_out[MAX_SENSOR_COUNT];
+uint32_t prev_integrator_out[MAX_SENSOR_COUNT];
+uint32_t prev_comb1[MAX_SENSOR_COUNT];
+uint32_t prev_comb2[MAX_SENSOR_COUNT];
 
+float calibrated_sensor_vals[MAX_SENSOR_COUNT];
 
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[3072];
@@ -417,15 +424,32 @@ void StartProcessingTask(void *argument)
 	  //perform filtering and decimation and log data to sd card
 	  else{
 		  /*TODO: implement filtering and decimation*/
+		  decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
+		  //feed the values through the integrator chain
+		  for (int i = 0; i < sensor_count; i++){
+			  integrator_1[i] += current_buffer[i];
+			  integrator_2[i] += integrator_1[i];
+			  integrator_out[i] += integrator_2[i];
+		  }
 		  	/***Raw sampling buffer is now decoupled from processing **/
-		  	 if (decimation_count == DECIMATED_LOGGING_FACTOR){
-		  		 memcpy(decimated_sensor_vals,current_buffer,sensor_count*sizeof(uint16_t));
+		  //perform decimation and feed forward (NOTE: processing task may 'fall behind' here)
+		  	 if ((decimation_count % DECIMATED_LOGGING_FACTOR) == 0){
 		  		int line_len = 0;
 		  		get_timestamp_interface(timestamp,50);
 		  		line_len+= snprintf(line_buf, sizeof(line_buf),"%s,",timestamp);
 		  		 for (int i = 0; i < sensor_count; i++){
-		  			float voltage_val = decimated_sensor_vals[i]*4096/4096;
-		  			 calibrated_sensor_vals[i] = voltage_val*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
+		  			uint32_t comb1 = integrator_out[i] - prev_integrator_out[i];
+		  			prev_integrator_out[i] = integrator_out[i];
+
+		  			uint32_t comb2 = comb1 - prev_comb1[i];
+		  			prev_comb1[i] = comb1;
+
+		  			uint32_t comb3 = comb2 - prev_comb2[i];
+		  			prev_comb2[i] = comb2;
+
+		  			//normalize and process output
+		  			uint32_t final_result = (comb3 >> GAIN_COMP);
+		  			calibrated_sensor_vals[i] = (final_result*0.001)*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
 		  			line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_sensor_vals[i]);
 		  		 }
 		  		line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");

@@ -47,6 +47,8 @@ typedef struct {
 typedef struct {
 	GPIO_TypeDef *GPIO_Port;
 	uint16_t GPIO_Pin;
+	int channel;
+	uint16_t adc_cs;
 } driver;
 
 typedef struct{

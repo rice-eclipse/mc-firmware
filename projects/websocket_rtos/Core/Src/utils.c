@@ -10,6 +10,8 @@
 #include <stdlib.h>
 
 static char TxBuffer[300];
+uint8_t spi2_tx[3];
+uint8_t spi2_rx[3];
 
 static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
   if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
@@ -139,6 +141,7 @@ int parse_config(const char *config_str,
 
 		        int curr_driver = 0;
 		        int gpio_pin = 0;
+
 		        cJSON_ArrayForEach(driver_obj, drivers) {
 		            char *enabled = cJSON_GetObjectItemCaseSensitive(driver_obj, "enabled")->valuestring;
 		            if (strcmp(enabled,"true") == 0) {
@@ -175,6 +178,8 @@ int parse_config(const char *config_str,
 		                	new_driver.GPIO_Pin = DRV0_Pin;
 		                	break;
 		                }
+		                new_driver.adc_cs = ADC3_CS_Pin;
+		                new_driver.channel = cJSON_GetObjectItemCaseSensitive(driver_obj, "channel")->valueint;
 		                driver_list[curr_driver] = new_driver;
 		                curr_driver++;
 		            }
@@ -534,8 +539,6 @@ int get_timestamp(char *timestamp_str, int timestamp_str_size){
 		return -1;
 	}
 	return 0;
-
-
 }
 void filter_and_decimate(float *sensor_vals, int sensor_count){
 	return;

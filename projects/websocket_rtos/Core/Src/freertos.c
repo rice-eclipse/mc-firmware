@@ -65,6 +65,8 @@ typedef struct{
 //Three stage CIC filter
 #define GAIN_COMP 9
 #define DECIMATED_TELEMETRY_FACTOR 104
+
+#define MIN_DRV_CURRENT_ADCVAL 800
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -92,7 +94,6 @@ int sample_count;
 //tx and rx buffers for ADC sample retrieval
 uint8_t tx[3];
 uint8_t rx[3];
-
 //decimation count for the CIC filter and the buffers for all the stages
 int decimation_count;
 uint32_t integrator_1[MAX_SENSOR_COUNT];
@@ -187,6 +188,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
 void add_datafile_header();
 static void ignition_timer_Callback(void *argument);
+uint16_t get_drivercurr(driver drv);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -294,8 +296,9 @@ void StartServerTask(void *argument)
 		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 			  if (client->data[0] == 'W'){
 				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
-				  if (telem_queue_status == osOK){
+				  while (telem_queue_status == osOK){
 					 mg_ws_send(client, (void *)telem.telem_buf,strlen(telem.telem_buf), WEBSOCKET_OP_TEXT);
+					 telem_queue_status = osMessageQueueGet(telemMessageQueueHandle, &telem, NULL, 0);
 				 }
 			  }
 		  }
@@ -363,8 +366,9 @@ void StartCmdHandlingTask(void *argument)
 		if (driver_id >= 0 && driver_id < MAX_DRIVER_COUNT){
 			HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
 			//TODO: use driver current monitors to verify this
+			uint16_t adc_current = get_drivercurr(driver_list[driver_id]);
 			osMutexAcquire(driversMutexHandle, osWaitForever);
-			driver_states[driver_id] = (direction == 1) ? 1 : 0;
+			driver_states[driver_id] = (adc_current >= MIN_DRV_CURRENT_ADCVAL) ? 1 : 0;
 			osMutexRelease(driversMutexHandle);
 			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
 			sprintf(telem.telem_buf,"Actuating driver id %d - %d\r\n", driver_list[driver_id].GPIO_Pin, direction);
@@ -399,7 +403,6 @@ void StartProcessingTask(void *argument)
 	add_datafile_header();
 	open_file_interface(&log_file, console_filename);
 	/*We sync the file to the sd card every second*/
-	int sync_count = 0;
 	int log_count =0;
 #ifndef TEST_LOGIC
 	FRESULT fres;
@@ -419,6 +422,12 @@ void StartProcessingTask(void *argument)
 	  stopLogging_flag = osThreadFlagsWait(STOP_LOGGING, (osFlagsWaitAny|osFlagsNoClear), 10);
 	  //if a shutdown flag is set, we don't perform any more logging operations and let the shutdown task know it can access the sd card
 	  if (stopLogging_flag == STOP_LOGGING){
+		  osMutexAcquire(loggingMutexHandle, osWaitForever);
+#ifndef TEST_LOGIC
+		  f_sync(&data_file);
+		  f_sync(&log_file);
+	#endif
+		  osMutexRelease(loggingMutexHandle);
 		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
 	  }
 	  //perform filtering and decimation and log data to sd card
@@ -465,11 +474,9 @@ void StartProcessingTask(void *argument)
 					  log_count = 20;
 				  }
 				  if (log_count == 20){
-					  osMutexAcquire(loggingMutexHandle, osWaitForever);
 		#ifndef TEST_LOGIC
 					  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
 		#endif
-					  osMutexRelease(loggingMutexHandle);
 					  //clear the sd write buffer for the next cycle
 					  sd_card_pos = 0;
 					  log_count = 0;
@@ -487,7 +494,7 @@ void StartProcessingTask(void *argument)
 						  osMutexRelease(loggingMutexHandle);
 						  }
 				  //idk if we want to add another filter for this
-		  		 if (decimation_count == DECIMATED_TELEMETRY_FACTOR){
+		  		 if (decimation_count == 0){
 		  			 memcpy(telem_snapshot.cal_sensor_vals, calibrated_sensor_vals, sensor_count*sizeof(float));
 		  			 osMutexAcquire(driversMutexHandle, 100U);
 		  			 memcpy(telem_snapshot.driver_states, driver_states, driver_count*sizeof(int));
@@ -664,6 +671,7 @@ static void ignition_timer_Callback(void *argument){
 	}
 	else if (ignition_count == 0){
 		HAL_GPIO_WritePin(IGN_GPIO_Port, IGN_Pin, GPIO_PIN_SET);
+		ignition_count = 10;
 		sprintf(ign_telem.telem_buf,"IGNITION IN PROGRESS\r\n");
 		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 	}
@@ -689,6 +697,18 @@ void add_datafile_header(){
 #ifndef TEST_LOGIC
 	append_file_interface(&data_file, data_header_str, card_pos);
 #endif
+}
+uint16_t get_drivercurr(driver drv){
+	uint8_t drv_tx[3];
+	uint8_t drv_rx[3];
+	 int curr_channel = drv.channel;
+	 drv_tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
+	 drv_tx[1] = (curr_channel & 0x03) << 6;
+	 drv_tx[2] = 0x00;
+	 HAL_GPIO_WritePin(GPIOF,drv.adc_cs, GPIO_PIN_RESET);
+	 HAL_SPI_TransmitReceive(&hspi2, drv_tx, drv_rx, 3,100);
+	 uint16_t adc_val = ((drv_rx[1] & 0xF) << 8) | drv_rx[2];
+	 return adc_val;
 }
 /* USER CODE END Application */
 

@@ -59,12 +59,7 @@ int parse_config(const char *config_str,
 		        status = 1;
 		        goto end;
 		    }
-		    host_children = host->child;
-
-
-		    if (host_children != NULL && host_children->valuestring != NULL && host_ip != NULL) {
-		        strcpy(host_ip, host_children->valuestring);
-		    }
+		    strcpy(host_ip, host->valuestring);
 
 		    *port = cJSON_GetObjectItemCaseSensitive(config_json, "port")->valueint;
 
@@ -453,7 +448,9 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	return dataBuff;
 }
 int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, const char *config_filename){
-	FILINFO fno;
+		FILINFO fno = {0};
+		memset(time_field, 0, sizeof(*time_field));
+		memset(date_field, 0, sizeof(*date_field));
 		FRESULT fres;
 		fres = f_stat(config_filename, &fno);
 		if (fres != FR_OK){

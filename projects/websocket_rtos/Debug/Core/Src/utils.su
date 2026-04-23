@@ -10,7 +10,7 @@
 ../Core/Src/utils.c:436:7:get_sensorval	24	static
 ../Core/Src/utils.c:444:10:get_mcp3208_adcval	48	static
 ../Core/Src/utils.c:463:5:gen_rtc_start_params	64	static
-../Core/Src/utils.c:485:5:gen_filename	128	static
-../Core/Src/utils.c:533:5:get_timestamp	80	static
-../Core/Src/utils.c:553:6:filter_and_decimate	16	static
-../Core/Src/utils.c:557:6:ignition_sequence	8	static
+../Core/Src/utils.c:487:5:gen_filename	128	static
+../Core/Src/utils.c:535:5:get_timestamp	80	static
+../Core/Src/utils.c:555:6:filter_and_decimate	16	static
+../Core/Src/utils.c:559:6:ignition_sequence	8	static

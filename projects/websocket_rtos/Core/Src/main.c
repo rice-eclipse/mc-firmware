@@ -139,9 +139,10 @@ int main(void)
    HAL_Delay(1);
    mount_sd_interface(&FatFs);
   /*initialize the rtc using the last modified date of the config file*/
-  gen_rtc_start_params_interface(&rtc_init_time, &rtc_init_date,"config.json");
-  time_set_res = HAL_RTC_SetTime(&hrtc, &rtc_init_time,RTC_FORMAT_BIN);
-  time_set_res |= HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BIN);
+   if (gen_rtc_start_params_interface(&rtc_init_time, &rtc_init_date, "config.json") == 0) {
+       time_set_res = HAL_RTC_SetTime(&hrtc, &rtc_init_time, RTC_FORMAT_BIN);
+       time_set_res |= HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BIN);
+   }
   if (time_set_res != HAL_OK){
 	  sprintf(TxBuffer, "Error in setting up rtc");
 	  HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);

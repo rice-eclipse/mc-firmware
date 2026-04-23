@@ -461,8 +461,10 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	return dataBuff;
 }
 int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, const char *config_filename){
-	FILINFO fno;
-		FRESULT fres;
+	FILINFO fno = {0};
+	memset(time_field, 0, sizeof(*time_field));
+	    memset(date_field, 0, sizeof(*date_field));
+	FRESULT fres;
 		fres = f_stat(config_filename, &fno);
 		if (fres != FR_OK){
 			return -1;

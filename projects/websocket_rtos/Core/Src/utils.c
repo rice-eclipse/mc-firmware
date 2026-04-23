@@ -33,9 +33,8 @@ int parse_config(const char *config_str,
 				 int *sensor_count,
 				 int *monitor_count)
 {
-	const cJSON *host = NULL;
+			const cJSON *host = NULL;
 		    const cJSON *pwd = NULL;
-		    const cJSON *host_children = NULL;
 		    const cJSON *sampling_f_ign = NULL;
 		    const cJSON *sampling_f_standby = NULL;
 		    const cJSON *sensors = NULL;
@@ -53,16 +52,7 @@ int parse_config(const char *config_str,
 				goto end;
 			}
 			host = cJSON_GetObjectItemCaseSensitive(config_json, "host");
-		    if (host == NULL){
-		        status = 1;
-		        goto end;
-		    }
-		    host_children = host->child;
-
-
-		    if (host_children != NULL && host_children->valuestring != NULL && host_ip != NULL) {
-		        strcpy(host_ip, host_children->valuestring);
-		    }
+			strcpy(host_ip, host->valuestring);
 
 		    *port = cJSON_GetObjectItemCaseSensitive(config_json, "port")->valueint;
 
@@ -110,15 +100,15 @@ int parse_config(const char *config_str,
 
 						switch (cs_pin){
 						case 1:
-							new_sensor.adc_cs = 1;
+							new_sensor.adc_cs = ADC1_CS_Pin;
 							break;
-						case 2:
-							new_sensor.adc_cs = 1;
+						case 3:
+							new_sensor.adc_cs = ADC3_CS_Pin;
 							break;
 							break;
 						//need to do some error handling here
 						default:
-							new_sensor.adc_cs = 1;
+							new_sensor.adc_cs = ADC2_CS_Pin;
 							break;
 						}
 
@@ -205,7 +195,6 @@ int parse_config(const char *config_str,
 		               	return -2;
 		               }
 		        int curr_monitor = 0;
-
 		        int cs_pin = 0;
 		        cJSON_ArrayForEach(monitor_obj, monitors) {
 		            char *enabled = cJSON_GetObjectItemCaseSensitive(monitor_obj, "enabled")->valuestring;
@@ -218,19 +207,7 @@ int parse_config(const char *config_str,
 		                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_intercept")->valuedouble;
 		                new_monitor.calibration_slope =
 		                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_slope")->valuedouble;
-
-		                switch (cs_pin){
-							case 1:
-								new_monitor.adc_cs =1;
-								break;
-							case 2:
-								new_monitor.adc_cs = 1;
-								break;
-							//need to do some error handling here
-							default:
-								new_monitor.adc_cs = 1;
-								break;
-							}
+		                new_monitor.adc_cs = ADC2_CS_Pin;
 		                monitor_list[curr_monitor] = new_monitor;
 		                curr_monitor++;
 		            }
@@ -435,7 +412,7 @@ int close_file(FIL *target_file){
 }
 float get_sensorval(sensor *current_sensor){
 	static uint16_t adc_val = 0;
-	//uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
+	adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
 	adc_val = (adc_val + 10) % 200;
 	float voltage = (adc_val)*4.096/4096;
 	float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
@@ -452,9 +429,9 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	//don't care
 	tx[2] = 0x00;
 
-	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_RESET);
+	HAL_GPIO_WritePin(GPIOF, cs, GPIO_PIN_RESET);
 	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
-	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOF, cs, GPIO_PIN_SET);
 
 	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
 
@@ -485,7 +462,7 @@ int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_fiel
 
 }
 int gen_filename(char *target_filename,const char *config_filename, char *target_type){
-	FILINFO fno;
+	FILINFO fno = {0};
 	FRESULT fres;
 	fres = f_stat(config_filename, &fno);
 	if (fres != FR_OK){

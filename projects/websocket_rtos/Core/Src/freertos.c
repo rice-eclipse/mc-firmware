@@ -39,6 +39,10 @@ typedef struct{
 	uint8_t cmd_idx;
 } CMDQUEUE_OBJ_T;
 
+typedef struct {
+    float sensor_vals[MAX_SENSOR_COUNT];
+    int driver_states[MAX_DRIVER_COUNT];
+} telemetry_snapshot_t;
 
 /* USER CODE END PTD */
 
@@ -68,19 +72,17 @@ static char TxBuffer[300];
 
 static char sensor_data_str[4000];
 //Ping-pong buffer for data to write to sd
-float sensor_vals[2*MAX_SENSOR_COUNT];
+uint16_t sensor_vals[2*MAX_SENSOR_COUNT];
 int driver_states[MAX_DRIVER_COUNT];
 //the snapshot of sensor vals to send to mission control
 //pointer to the 'last filled buffer'
-float *filled_buffer;
-float vals_to_send[MAX_SENSOR_COUNT];
-int driver_states_to_send[MAX_DRIVER_COUNT];
-
+uint16_t *filled_buffer;
+int decimation_counter;
 //stores the sensor values in a single string to write to the sd card
 char sdcard_data[4096];
 char data_log[250];
 char cmd_log[400];
-
+float calibrated_vals[MAX_SENSOR_COUNT];
 //str for data header and logging each line
 char line_buf[300];
 char data_header_str[300];
@@ -90,6 +92,7 @@ char timestamp[50];
 FIL data_file;
 FIL log_file;
 
+telemetry_snapshot_t telem_snapshot;
 //tracks the number of samples collected
 unsigned long samples_collected;
 
@@ -153,6 +156,11 @@ osMutexId_t driversMutexHandle;
 const osMutexAttr_t driversMutex_attributes = {
   .name = "driversMutex"
 };
+/* Definitions for telemdataMutex */
+osMutexId_t telemdataMutexHandle;
+const osMutexAttr_t telemdataMutex_attributes = {
+  .name = "telemdataMutex"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
@@ -181,7 +189,7 @@ void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 	samples_collected = 0;
 	first_pass_completed = 0;
-
+	decimation_counter = 0;
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
@@ -191,6 +199,8 @@ void MX_FREERTOS_Init(void) {
    /* USER CODE END RTOS_QUEUES */
   /* creation of driversMutex */
   driversMutexHandle = osMutexNew(&driversMutex_attributes);
+
+  telemdataMutexHandle = osMutexNew(&telemdataMutex_attributes);
 
 /* USER CODE BEGIN Header_StartDefaultTask */
   defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
@@ -252,20 +262,16 @@ void StartServerTask(void *argument)
 	  //package the data in json for the websocket and send at each sending interval
 	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 	  if (sending_flag == SEND_NOW){
-		  if (filled_buffer != NULL){
-			  memcpy(vals_to_send, filled_buffer, sensor_count*sizeof(float));
-
-			  osMutexAcquire(driversMutexHandle, 100U);
-			  memcpy(driver_states_to_send, driver_states, driver_count*sizeof(float));
-			  osMutexRelease(driversMutexHandle);
-
-			  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),vals_to_send,driver_states_to_send);
-			  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
-				  if (client->data[0] == 'W'){
-					  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
-				  }
+		  osMutexAcquire(driversMutexHandle, 100U);
+		  memcpy(telem_snapshot.driver_states, driver_states, driver_count*sizeof(float));
+		  osMutexRelease(driversMutexHandle);
+		  osMutexAcquire(telemdataMutexHandle, 100U);
+		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),telem_snapshot.sensor_vals,telem_snapshot.driver_states);
+		  osMutexRelease(telemdataMutexHandle);
+		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
+			  if (client->data[0] == 'W'){
+				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
 			  }
-
 		  }
 
 	  }
@@ -363,8 +369,9 @@ void StartCollectionTask(void *argument)
   for(;;)
   {
 	   osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
-
-		 sensor_vals[sample_count] = get_sensorval_interface(&sensor_list[sample_count%sensor_count]);
+	   	 int channel = sensor_list[sample_count%sensor_count].channel;
+	   	 int cs = sensor_list[sample_count%sensor_count].adc_cs;
+		 sensor_vals[sample_count] = get_mcp3208_adcval(channel, cs, &hspi1);
 		 			  //sprintf(TxBuffer,"recorded val: %f\r\n", sensor_vals[sample_count]);
 		 			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 
@@ -400,7 +407,7 @@ void StartProcessingTask(void *argument)
 	uint32_t processing_flag;
 	uint32_t stopLogging_flag;
 	int sd_card_pos = 0;
-	float *current_buffer;
+	uint16_t *current_buffer;
 	open_file_interface(&data_file, data_filename);
 	add_datafile_header();
 	open_file_interface(&log_file, console_filename);
@@ -417,25 +424,28 @@ void StartProcessingTask(void *argument)
 	  			  	  	  	  	  	  	  	  osFlagsWaitAny, osWaitForever);
 
 	  //set the current buf pointer to the first part of the data buffer
+	  decimation_counter = (decimation_counter + 1)%125;
 	  if (processing_flag & FIRST_BUF_READY){
 		  current_buffer = &sensor_vals[0];
 	  }
 	  else if (processing_flag & SECOND_BUF_READY){
 		  current_buffer = &sensor_vals[sensor_count];
 	  }
+
 	  stopLogging_flag = osThreadFlagsWait(STOP_LOGGING, (osFlagsWaitAny|osFlagsNoClear), 10);
 	  //if a shutdown flag is set, we don't perform any more logging operations and let the shutdown task know it can access the sd card
 	  if (stopLogging_flag == STOP_LOGGING){
 		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
 	  }
 	  //perform filtering and decimation and log data to sd card
-
-	  else{
-		  filter_and_decimate_interface(current_buffer, sensor_count);
+	  //1000Hz->125Hz
+	  else if ((decimation_counter % 8) == 0){
 		  int line_len = 0;
 		  //writes the all the sensor data collected in the current timestep to the line buffer
 		  for (int i = 0; i < sensor_count; i++){
-			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",current_buffer[i]);
+			  float temp = current_buffer[i]*0.001;
+			  calibrated_vals[i] = temp*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
+			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_vals[i]);
 		  }
 		  //signal to the collection task that it has consumed a buffer
 		  osThreadFlagsSet(collectionTaskHandle,BUFFER_CONSUMED);
@@ -461,8 +471,14 @@ void StartProcessingTask(void *argument)
 		  sd_card_pos = 0;
 		  log_count = 0;
 	  }
-		  //Log whenever 1000 samples have been collected
 
+		  //update snapshot at 8Hz
+		  if (decimation_counter == 0){
+			  osMutexAcquire(telemdataMutexHandle,10);
+			  memcpy(telem_snapshot.sensor_vals,calibrated_vals, sensor_count*sizeof(float));
+			  osMutexRelease(telemdataMutexHandle);
+		  }
+		  //Log whenever 1000 samples have been collected
 		  if ((samples_collected % 1000) == 0){
 			  get_timestamp_interface(timestamp, 50);
 			  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);

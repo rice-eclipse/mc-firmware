@@ -116,6 +116,12 @@ void Error_Handler(void);
 #define DRV4_GPIO_Port GPIOF
 #define IGN_Pin GPIO_PIN_5
 #define IGN_GPIO_Port GPIOF
+#define ADC1_CS_Pin GPIO_PIN_6
+#define ADC1_CS_GPIO_Port GPIOF
+#define ADC2_CS_Pin GPIO_PIN_7
+#define ADC2_CS_GPIO_Port GPIOF
+#define ADC3_CS_Pin GPIO_PIN_8
+#define ADC3_CS_GPIO_Port GPIOF
 #define MCO_Pin GPIO_PIN_0
 #define MCO_GPIO_Port GPIOH
 #define RMII_MDC_Pin GPIO_PIN_1

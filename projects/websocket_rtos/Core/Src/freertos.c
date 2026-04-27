@@ -92,6 +92,11 @@ char timestamp[50];
 FIL data_file;
 FIL log_file;
 
+//adc data collection
+uint8_t tx[3];
+uint8_t rx[3];
+//current sample in the current snapshot
+int sample_count;
 telemetry_snapshot_t telem_snapshot;
 //tracks the number of samples collected
 unsigned long samples_collected;
@@ -124,13 +129,6 @@ const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
   .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
-};
-/* Definitions for collectionTask */
-osThreadId_t collectionTaskHandle;
-const osThreadAttr_t collectionTask_attributes = {
-  .name = "collectionTask",
-  .stack_size = 256 * 4,
-  .priority = (osPriority_t) osPriorityRealtime,
 };
 /* Definitions for processingTask */
 osThreadId_t processingTaskHandle;
@@ -172,7 +170,6 @@ void add_datafile_header();
 void StartDefaultTask(void *argument);
 void StartServerTask(void *argument);
 void StartCmdHandlingTask(void *argument);
-void StartCollectionTask(void *argument);
 void StartProcessingTask(void *argument);
 void StartShutdownTask(void *argument);
 void vApplicationStackOverflowHook( TaskHandle_t xTask,
@@ -190,6 +187,7 @@ void MX_FREERTOS_Init(void) {
 	samples_collected = 0;
 	first_pass_completed = 0;
 	decimation_counter = 0;
+	sample_count = 0;
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
@@ -224,7 +222,6 @@ void StartDefaultTask(void *argument)
    /*Start the timers and the rest of the tasks and creates the necessary files*/\
    create_file_interface(&data_file,data_filename);
    create_file_interface(&log_file,console_filename);
-   collectionTaskHandle = osThreadNew(StartCollectionTask, NULL, &collectionTask_attributes);
   cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
   processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
@@ -363,7 +360,7 @@ void StartCmdHandlingTask(void *argument)
 void StartCollectionTask(void *argument)
 {
   /* USER CODE BEGIN StartCollectionTask */
-	int sample_count = 0;
+
 
   /* Infinite loop */
   for(;;)
@@ -448,7 +445,7 @@ void StartProcessingTask(void *argument)
 			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_vals[i]);
 		  }
 		  //signal to the collection task that it has consumed a buffer
-		  osThreadFlagsSet(collectionTaskHandle,BUFFER_CONSUMED);
+		  //osThreadFlagsSet(collectionTaskHandle,BUFFER_CONSUMED);
 		  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
 		  //only add the new line if it doesn't cause an overflow
 		  if (sd_card_pos+line_len < sizeof(sdcard_data)){
@@ -532,11 +529,17 @@ void StartShutdownTask(void *argument)
 	  	close_file_interface(&data_file);
 	  	close_file_interface(&log_file);
 	  	unmount_sd_interface();
-	  	if (collectionTaskHandle != NULL){
-	  		osThreadTerminate(collectionTaskHandle);
-	  	}
 	  	if (processingTaskHandle != NULL){
 	  		osThreadTerminate(processingTaskHandle);
+	  	}
+	  	if (shutdownTaskHandle != NULL){
+			osThreadTerminate(shutdownTaskHandle);
+		}
+	  	if (serverTaskHandle != NULL){
+			osThreadTerminate(serverTaskHandle);
+		}
+	  	if (cmdHandlingTaskHandle != NULL){
+	  		osThreadTerminate(cmdHandlingTaskHandle);
 	  	}
 	  	sprintf(TxBuffer, "All tasks closed\r\n");
 	  	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -619,7 +622,13 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
   /* USER CODE BEGIN Callback 1 */
   if (htim->Instance == TIM14){
-	  osThreadFlagsSet(collectionTaskHandle, SAMPLE_NOW);
+	  int curr_channel = sensor_list[sample_count%sensor_count].channel;
+	tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
+	tx[1] = (curr_channel & 0x03) << 6;
+	tx[2] = 0x00;
+
+	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
+	HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
   }
   if (htim->Instance == TIM13){
 	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
@@ -629,6 +638,21 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
 
   /* USER CODE END Callback 1 */
+}
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
+	if (hspi->Instance == SPI1){
+		HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_SET);
+		sensor_vals[sample_count] = ((rx[1] & 0xF) << 8) | rx[2];
+		sample_count = (sample_count + 1) % (sensor_count*2);
+
+		//notify processing task if either of the ping pong buffers is full
+		if (sample_count == sensor_count){
+			osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
+		}
+		else if (sample_count == 0){
+			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+		}
+	}
 }
 
 void add_datafile_header(){

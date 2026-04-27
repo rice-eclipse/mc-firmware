@@ -80,7 +80,6 @@ void MX_FREERTOS_Init(void);
 int port = 0;
 int sampling_freq_ign = 0;
 int sampling_freq_standby = 0;
-int decimation_factor = 0;
 char console_filename[MAX_FILENAME_LENGTH];
 char cmd_password[MAX_PWD_LENGTH];
 char data_filename[MAX_FILENAME_LENGTH];
@@ -135,16 +134,15 @@ int main(void)
   MX_FATFS_Init();
   MX_TIM11_Init();
   MX_RTC_Init();
-  MX_SPI2_Init();
-  MX_TIM10_Init();
   /* USER CODE BEGIN 2 */
   /*Mount the sd card to read information from it*/
    HAL_Delay(1);
    mount_sd_interface(&FatFs);
   /*initialize the rtc using the last modified date of the config file*/
-  gen_rtc_start_params_interface(&rtc_init_time, &rtc_init_date,"config.json");
-  time_set_res = HAL_RTC_SetTime(&hrtc, &rtc_init_time,RTC_FORMAT_BIN);
-  time_set_res |= HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BIN);
+   if (gen_rtc_start_params_interface(&rtc_init_time, &rtc_init_date, "config.json") == 0) {
+       time_set_res = HAL_RTC_SetTime(&hrtc, &rtc_init_time, RTC_FORMAT_BIN);
+       time_set_res |= HAL_RTC_SetDate(&hrtc, &rtc_init_date, RTC_FORMAT_BIN);
+   }
   if (time_set_res != HAL_OK){
 	  sprintf(TxBuffer, "Error in setting up rtc");
 	  HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
@@ -156,7 +154,6 @@ int main(void)
        parse_config_interface(config_str, driver_list, sensor_list, monitor_list, &ignition, host_ip, cmd_password, &port, &sampling_freq_ign, &sampling_freq_standby,
      		  	  	  	  	  &driver_count, &sensor_count, &monitor_count);
 
-     decimation_factor = sampling_freq_ign/sampling_freq_standby;
    /*Use the config file modified timestamp to seed the RTC and generate  filenames for logging and data*/
     gen_filename_interface(data_filename,"config.json", "data");
     gen_filename_interface(console_filename, "config.json","log");
@@ -235,6 +232,7 @@ void SystemClock_Config(void)
 /* USER CODE BEGIN 4 */
 
 /* USER CODE END 4 */
+
 
 /**
   * @brief  This function is executed in case of error occurrence.

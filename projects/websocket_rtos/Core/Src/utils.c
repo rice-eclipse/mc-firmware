@@ -10,8 +10,6 @@
 #include <stdlib.h>
 
 static char TxBuffer[300];
-uint8_t spi2_tx[3];
-uint8_t spi2_rx[3];
 
 static int jsoneq(const char *json, jsmntok_t *tok, const char *s) {
   if (tok->type == JSMN_STRING && (int)strlen(s) == tok->end - tok->start &&
@@ -35,9 +33,8 @@ int parse_config(const char *config_str,
 				 int *sensor_count,
 				 int *monitor_count)
 {
-	const cJSON *host = NULL;
+			const cJSON *host = NULL;
 		    const cJSON *pwd = NULL;
-		    const cJSON *host_children = NULL;
 		    const cJSON *sampling_f_ign = NULL;
 		    const cJSON *sampling_f_standby = NULL;
 		    const cJSON *sensors = NULL;
@@ -55,11 +52,7 @@ int parse_config(const char *config_str,
 				goto end;
 			}
 			host = cJSON_GetObjectItemCaseSensitive(config_json, "host");
-		    if (host == NULL){
-		        status = 1;
-		        goto end;
-		    }
-		    strcpy(host_ip, host->valuestring);
+			strcpy(host_ip, host->valuestring);
 
 		    *port = cJSON_GetObjectItemCaseSensitive(config_json, "port")->valueint;
 
@@ -109,12 +102,13 @@ int parse_config(const char *config_str,
 						case 1:
 							new_sensor.adc_cs = ADC1_CS_Pin;
 							break;
-						case 2:
-							new_sensor.adc_cs = ADC2_CS_Pin;
+						case 3:
+							new_sensor.adc_cs = ADC3_CS_Pin;
+							break;
 							break;
 						//need to do some error handling here
 						default:
-							new_sensor.adc_cs = ADC1_CS_Pin;
+							new_sensor.adc_cs = ADC2_CS_Pin;
 							break;
 						}
 
@@ -136,7 +130,6 @@ int parse_config(const char *config_str,
 
 		        int curr_driver = 0;
 		        int gpio_pin = 0;
-
 		        cJSON_ArrayForEach(driver_obj, drivers) {
 		            char *enabled = cJSON_GetObjectItemCaseSensitive(driver_obj, "enabled")->valuestring;
 		            if (strcmp(enabled,"true") == 0) {
@@ -173,8 +166,6 @@ int parse_config(const char *config_str,
 		                	new_driver.GPIO_Pin = DRV0_Pin;
 		                	break;
 		                }
-		                new_driver.adc_cs = ADC3_CS_Pin;
-		                new_driver.channel = cJSON_GetObjectItemCaseSensitive(driver_obj, "channel")->valueint;
 		                driver_list[curr_driver] = new_driver;
 		                curr_driver++;
 		            }
@@ -204,7 +195,6 @@ int parse_config(const char *config_str,
 		               	return -2;
 		               }
 		        int curr_monitor = 0;
-
 		        int cs_pin = 0;
 		        cJSON_ArrayForEach(monitor_obj, monitors) {
 		            char *enabled = cJSON_GetObjectItemCaseSensitive(monitor_obj, "enabled")->valuestring;
@@ -217,7 +207,7 @@ int parse_config(const char *config_str,
 		                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_intercept")->valuedouble;
 		                new_monitor.calibration_slope =
 		                    (float)cJSON_GetObjectItemCaseSensitive(monitor_obj, "calibration_slope")->valuedouble;
-		                new_monitor.adc_cs = ADC3_CS_Pin;
+		                new_monitor.adc_cs = ADC2_CS_Pin;
 		                monitor_list[curr_monitor] = new_monitor;
 		                curr_monitor++;
 		            }
@@ -280,9 +270,9 @@ int parse_command(const char *json_string, int *driver_id, int *direction, drive
 
 		    // 1. Check Password
 		    if (!pass_valid) {
-		        //sprintf(TxBuffer, "Incorrect Password\r\n");
-		        //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-		        return -1;
+		        sprintf(TxBuffer, "Incorrect Password\r\n");
+		        HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+		        return 1;
 		    }
 		    if (type_tok != NULL) {
 		        if (jsoneq(json_string, type_tok, "Actuate") == 0) {
@@ -422,8 +412,8 @@ int close_file(FIL *target_file){
 }
 float get_sensorval(sensor *current_sensor){
 	static uint16_t adc_val = 0;
-	//uint16_t adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
-	adc_val = (adc_val + 10) % 200; //what am I doing here
+	adc_val = get_mcp3208_adcval(current_sensor->channel, current_sensor->adc_cs, &hspi1);
+	adc_val = (adc_val + 10) % 200;
 	float voltage = (adc_val)*4.096/4096;
 	float sensor_val = (voltage*current_sensor->calibration_slope) + current_sensor->calibration_int;
 	return sensor_val;
@@ -439,19 +429,19 @@ uint16_t get_mcp3208_adcval(int channel, uint16_t cs, SPI_HandleTypeDef *spiHand
 	//don't care
 	tx[2] = 0x00;
 
-	HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_RESET);
-	HAL_SPI_TransmitReceive_IT(spiHandle, tx, rx, 3);
-	//HAL_GPIO_WritePin(GPIOC, cs, GPIO_PIN_SET);
+	HAL_GPIO_WritePin(GPIOF, cs, GPIO_PIN_RESET);
+	HAL_SPI_TransmitReceive(spiHandle, tx, rx, 3, HAL_MAX_DELAY);
+	HAL_GPIO_WritePin(GPIOF, cs, GPIO_PIN_SET);
 
 	uint16_t dataBuff = ((rx[1] & 0x0F) << 8) | rx[2];
 
 	return dataBuff;
 }
 int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_field, const char *config_filename){
-		FILINFO fno = {0};
-		memset(time_field, 0, sizeof(*time_field));
-		memset(date_field, 0, sizeof(*date_field));
-		FRESULT fres;
+	FILINFO fno = {0};
+	memset(time_field, 0, sizeof(*time_field));
+	    memset(date_field, 0, sizeof(*date_field));
+	FRESULT fres;
 		fres = f_stat(config_filename, &fno);
 		if (fres != FR_OK){
 			return -1;
@@ -472,7 +462,7 @@ int gen_rtc_start_params(RTC_TimeTypeDef *time_field, RTC_DateTypeDef *date_fiel
 
 }
 int gen_filename(char *target_filename,const char *config_filename, char *target_type){
-	FILINFO fno;
+	FILINFO fno = {0};
 	FRESULT fres;
 	fres = f_stat(config_filename, &fno);
 	if (fres != FR_OK){
@@ -536,6 +526,8 @@ int get_timestamp(char *timestamp_str, int timestamp_str_size){
 		return -1;
 	}
 	return 0;
+
+
 }
 void filter_and_decimate(float *sensor_vals, int sensor_count){
 	return;

@@ -40,12 +40,14 @@ typedef struct{
 } CMDQUEUE_OBJ_T;
 
 typedef struct{
-	char telem_buf[100];
+	char telem_buf[200];
 } TELEMQUEUE_OBJ_T;
-typedef struct{
-	float cal_sensor_vals[MAX_SENSOR_COUNT];
-	int driver_states[MAX_DRIVER_COUNT];
+
+typedef struct {
+    float sensor_vals[MAX_SENSOR_COUNT];
+    int driver_states[MAX_DRIVER_COUNT];
 } telemetry_snapshot_t;
+
 
 /* USER CODE END PTD */
 
@@ -59,14 +61,12 @@ typedef struct{
 #define LOGGING_STOPPED (1 << 4)
 #define STOP_LOGGING (1 << 5)
 #define SEND_NOW (1 << 7)
+#define BUFFER_CONSUMED (1 << 8)
 
-
-#define DECIMATED_LOGGING_FACTOR 8
 //Three stage CIC filter
 #define GAIN_COMP 9
-#define DECIMATED_TELEMETRY_FACTOR 104
-
-#define MIN_DRV_CURRENT_ADCVAL 800
+#define DECIMATED_LOGGING_FACTOR 8
+#define DECIMATED_TELEMETRY_FACTOR 125
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -79,38 +79,20 @@ typedef struct{
 char ip_addr[100];
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
-static char sensor_data_str[1072];
+
+static char sensor_data_str[4000];
 //Ping-pong buffer for data to write to sd
 uint16_t sensor_vals[2*MAX_SENSOR_COUNT];
 int driver_states[MAX_DRIVER_COUNT];
-telemetry_snapshot_t telem_snapshot;
-
-
-
-
-/*Make vals to log and vals to send the same*/
-/*Current sample in the current sampling cycle*/
-int sample_count;
-//tx and rx buffers for ADC sample retrieval
-uint8_t tx[3];
-uint8_t rx[3];
-//decimation count for the CIC filter and the buffers for all the stages
-int decimation_count;
-uint32_t integrator_1[MAX_SENSOR_COUNT];
-uint32_t integrator_2[MAX_SENSOR_COUNT];
-uint32_t integrator_out[MAX_SENSOR_COUNT];
-uint32_t prev_integrator_out[MAX_SENSOR_COUNT];
-uint32_t prev_comb1[MAX_SENSOR_COUNT];
-uint32_t prev_comb2[MAX_SENSOR_COUNT];
-
-float calibrated_sensor_vals[MAX_SENSOR_COUNT];
-
+//the snapshot of sensor vals to send to mission control
+//pointer to the 'last filled buffer'
+uint16_t *filled_buffer;
+int decimation_counter;
 //stores the sensor values in a single string to write to the sd card
-char sdcard_data[3072];
+char sdcard_data[4096];
 char data_log[250];
 char cmd_log[400];
-
-
+float calibrated_vals[MAX_SENSOR_COUNT];
 //str for data header and logging each line
 char line_buf[300];
 char data_header_str[300];
@@ -120,10 +102,27 @@ char timestamp[50];
 FIL data_file;
 FIL log_file;
 
-//ignition counter
-int ignition_count;
+//adc data collection
+uint8_t tx[3];
+uint8_t rx[3];
+
+//CIC Filter buffers
+uint32_t integrator_1[MAX_SENSOR_COUNT];
+uint32_t integrator_2[MAX_SENSOR_COUNT];
+uint32_t integrator_out[MAX_SENSOR_COUNT];
+uint32_t prev_integrator_out[MAX_SENSOR_COUNT];
+uint32_t prev_comb1[MAX_SENSOR_COUNT];
+uint32_t prev_comb2[MAX_SENSOR_COUNT];
+
+//current sample in the current snapshot
+int sample_count;
+telemetry_snapshot_t telem_snapshot;
 //tracks the number of samples collected
 unsigned long samples_collected;
+
+//Once collection task finishes the burst tw buffers it must wait for processing task
+volatile int first_pass_completed;
+
 osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
   .name = "cmdMessageQueue"
@@ -133,13 +132,16 @@ const osMessageQueueAttr_t telemMessageQueue_attributes = {
   .name = "telemMessageQueue"
 };
 
+//ignition counter
+int ignition_count;
 osTimerId_t ignition_timer;
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
 const osThreadAttr_t defaultTask_attributes = {
   .name = "defaultTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for serverTask */
@@ -153,7 +155,7 @@ const osThreadAttr_t serverTask_attributes = {
 osThreadId_t cmdHandlingTaskHandle;
 const osThreadAttr_t cmdHandlingTask_attributes = {
   .name = "cmdHandlingTask",
-  .stack_size = 256 * 4,
+  .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityHigh1,
 };
 /* Definitions for processingTask */
@@ -161,7 +163,7 @@ osThreadId_t processingTaskHandle;
 const osThreadAttr_t processingTask_attributes = {
   .name = "processingTask",
   .stack_size = 512 * 4,
-  .priority = (osPriority_t) osPriorityNormal1,
+  .priority = (osPriority_t) osPriorityNormal,
 };
 /* Definitions for shutdownTask */
 osThreadId_t shutdownTaskHandle;
@@ -180,15 +182,18 @@ osMutexId_t driversMutexHandle;
 const osMutexAttr_t driversMutex_attributes = {
   .name = "driversMutex"
 };
-
+/* Definitions for telemdataMutex */
+osMutexId_t telemdataMutexHandle;
+const osMutexAttr_t telemdataMutex_attributes = {
+  .name = "telemdataMutex"
+};
 
 /* Private function prototypes -----------------------------------------------*/
 /* USER CODE BEGIN FunctionPrototypes */
 static void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
-void add_datafile_header();
 static void ignition_timer_Callback(void *argument);
-uint16_t get_drivercurr(driver drv);
+void add_datafile_header();
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -196,7 +201,8 @@ void StartServerTask(void *argument);
 void StartCmdHandlingTask(void *argument);
 void StartProcessingTask(void *argument);
 void StartShutdownTask(void *argument);
-
+void vApplicationStackOverflowHook( TaskHandle_t xTask,
+                                    char *pcTaskName );
 extern void MX_LWIP_Init(void);
 void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 
@@ -208,28 +214,26 @@ void MX_FREERTOS_Init(void); /* (MISRA C 2004 rule 8.1) */
 void MX_FREERTOS_Init(void) {
   /* USER CODE BEGIN Init */
 	samples_collected = 0;
+	first_pass_completed = 0;
+	decimation_counter = 0;
 	sample_count = 0;
-	decimation_count = 0;
 	ignition_count = 10;
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
   loggingMutexHandle = osMutexNew(&loggingMutex_attributes);
-
-  /* creation of driversMutex */
-  driversMutexHandle = osMutexNew(&driversMutex_attributes);
-
   /* USER CODE BEGIN RTOS_QUEUES */
  	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
  	telemMessageQueueHandle = osMessageQueueNew(15, sizeof(TELEMQUEUE_OBJ_T), &telemMessageQueue_attributes);
-  /* USER CODE END RTOS_QUEUES */
+   /* USER CODE END RTOS_QUEUES */
+  /* creation of driversMutex */
+  driversMutexHandle = osMutexNew(&driversMutex_attributes);
 
-  /* Create the thread(s) */
-  /* creation of defaultTask */
-  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
-}
+  telemdataMutexHandle = osMutexNew(&telemdataMutex_attributes);
 
 /* USER CODE BEGIN Header_StartDefaultTask */
+  defaultTaskHandle = osThreadNew(StartDefaultTask, NULL, &defaultTask_attributes);
+}
 /**
   * @brief  Function implementing the defaultTask thread.
   * @param  argument: Not used
@@ -245,7 +249,8 @@ void StartDefaultTask(void *argument)
   while(ip4_addr_isany_val(*netif_ip4_addr(&gnetif)))
  	  osDelay(200);
    MG_INFO(("READY, IP: %s", ip4addr_ntoa(netif_ip4_addr(&gnetif))));
-   /*Start the timers and the rest of the tasks and creates the necessary files*/
+
+   /*Start the timers and the rest of the tasks and creates the necessary files*/\
    create_file_interface(&data_file,data_filename);
    create_file_interface(&log_file,console_filename);
   cmdHandlingTaskHandle = osThreadNew(StartCmdHandlingTask, NULL, &cmdHandlingTask_attributes);
@@ -275,8 +280,8 @@ void StartServerTask(void *argument)
 {
   /* USER CODE BEGIN StartServerTask */
 	TELEMQUEUE_OBJ_T telem;
-	sprintf(ip_addr, "http://%s:%d",host_ip,port);
 	osStatus_t telem_queue_status;
+	sprintf(ip_addr, "http://%s:%d",host_ip,port);
 	uint32_t sending_flag;
 	 struct mg_mgr mgr;
 	  mg_mgr_init(&mgr);
@@ -286,13 +291,15 @@ void StartServerTask(void *argument)
   {
 	  mg_mgr_poll(&mgr, 10);
 	  //package the data in json for the websocket and send at each sending interval
-	  sending_flag = osThreadFlagsWait((SEND_NOW), osFlagsWaitAny, 0);
-
-	  if ((sending_flag & SEND_NOW) != 0){
-		  //check if there is a telemetry messsage to send along with the data snapshot
+	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
+	  if (sending_flag == SEND_NOW){
 		  telem_queue_status = osMessageQueueGet(telemMessageQueueHandle, &telem, NULL, 0);
-		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),
-				  telem_snapshot.cal_sensor_vals,telem_snapshot.driver_states);
+		  osMutexAcquire(driversMutexHandle, 100U);
+		  memcpy(telem_snapshot.driver_states, driver_states, driver_count*sizeof(float));
+		  osMutexRelease(driversMutexHandle);
+		  osMutexAcquire(telemdataMutexHandle, 100U);
+		  sensor_message_interface(sensor_data_str, sizeof(sensor_data_str),telem_snapshot.sensor_vals,telem_snapshot.driver_states);
+		  osMutexRelease(telemdataMutexHandle);
 		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 			  if (client->data[0] == 'W'){
 				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
@@ -302,6 +309,7 @@ void StartServerTask(void *argument)
 				 }
 			  }
 		  }
+
 	  }
     osDelay(1);
   }
@@ -334,16 +342,11 @@ void StartCmdHandlingTask(void *argument)
   for(;;)
   {
 	osMessageQueueGet(cmdMessageQueueHandle, &cmd, NULL, osWaitForever);
-	get_timestamp_interface(cmd_timestamp, 50);
-	int result = parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
+
+	parse_command_interface(cmd.cmd_buf, &driver_id, &direction, driver_list, &ignition_flag,
 				  	  	  	  	  	&shutdown_flag, &stop_ignition_flag, &actuation_flag);
 	//HAL_UART_Transmit(&huart3, (uint8_t *)cmd.cmd_buf, strlen(cmd.cmd_buf), HAL_MAX_DELAY);
-	if (result == -1){
-		sprintf(cmd_log, "%s Incorrect password\r\n", cmd_timestamp);
-		sprintf(telem.telem_buf, "Incorrect password\r\n");
-		osMessageQueuePut(telemMessageQueueHandle, &telem, 0U,0U);
-		continue;
-	}
+	get_timestamp_interface(cmd_timestamp, 50);
 	sprintf(cmd_log, "%s Received command: %s\r\n",cmd_timestamp, cmd.cmd_buf);
 	osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
@@ -353,25 +356,35 @@ void StartCmdHandlingTask(void *argument)
 	if (shutdown_flag == 1){
 		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
 	}
+
 	if (stop_ignition_flag == 1){
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
-		osTimerStop(ignition_timer);
+		HAL_TIM_Base_Start_IT(&htim11);
+
 	}
 	else if (ignition_flag == 1){
-		//Ignition timer
+		//ignition_sequence();
 		osTimerStart(ignition_timer, 1000U);
+		//HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
 		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		//start shutdown timer after ignition
+		//HAL_TIM_Base_Start_IT(&htim11);
+
 	}
 	else if (actuation_flag == 1){
 		if (driver_id >= 0 && driver_id < MAX_DRIVER_COUNT){
 			HAL_GPIO_WritePin(driver_list[driver_id].GPIO_Port, driver_list[driver_id].GPIO_Pin, direction);
 			//TODO: use driver current monitors to verify this
-			uint16_t adc_current = get_drivercurr(driver_list[driver_id]);
 			osMutexAcquire(driversMutexHandle, osWaitForever);
-			driver_states[driver_id] = (adc_current >= MIN_DRV_CURRENT_ADCVAL) ? 1 : 0;
+			driver_states[driver_id] = (direction == 1) ? 1 : 0;
 			osMutexRelease(driversMutexHandle);
+
+			get_timestamp_interface(cmd_timestamp,50);
 			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
-			sprintf(telem.telem_buf,"Actuating driver id %d - %d\r\n", driver_list[driver_id].GPIO_Pin, direction);
+			sprintf(telem.telem_buf,
+			        "{\"console\":\"Actuating driver id %d - %d\"}",
+			        driver_list[driver_id].GPIO_Pin,
+			        direction);
 				osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
 			  fres = append_file_interface(&log_file, cmd_log, strlen(cmd_log));
@@ -403,6 +416,7 @@ void StartProcessingTask(void *argument)
 	add_datafile_header();
 	open_file_interface(&log_file, console_filename);
 	/*We sync the file to the sd card every second*/
+	int sync_count = 0;
 	int log_count =0;
 #ifndef TEST_LOGIC
 	FRESULT fres;
@@ -412,101 +426,109 @@ void StartProcessingTask(void *argument)
   {
 	  processing_flag = osThreadFlagsWait((FIRST_BUF_READY | SECOND_BUF_READY),
 	  			  	  	  	  	  	  	  	  osFlagsWaitAny, osWaitForever);
+
 	  //set the current buf pointer to the first part of the data buffer
+	  decimation_counter = (decimation_counter + 1)%DECIMATED_TELEMETRY_FACTOR;
 	  if (processing_flag & FIRST_BUF_READY){
 		  current_buffer = &sensor_vals[0];
 	  }
 	  else if (processing_flag & SECOND_BUF_READY){
 		  current_buffer = &sensor_vals[sensor_count];
 	  }
+
 	  stopLogging_flag = osThreadFlagsWait(STOP_LOGGING, (osFlagsWaitAny|osFlagsNoClear), 10);
 	  //if a shutdown flag is set, we don't perform any more logging operations and let the shutdown task know it can access the sd card
 	  if (stopLogging_flag == STOP_LOGGING){
-		  osMutexAcquire(loggingMutexHandle, osWaitForever);
-#ifndef TEST_LOGIC
-		  f_sync(&data_file);
-		  f_sync(&log_file);
-	#endif
-		  osMutexRelease(loggingMutexHandle);
 		  osThreadFlagsSet(shutdownTaskHandle,LOGGING_STOPPED);
 	  }
 	  //perform filtering and decimation and log data to sd card
+	  //1000Hz->125Hz
 	  else{
-		  /*TODO: implement filtering and decimation*/
-		  decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		  //feed the values through the integrator chain
 		  for (int i = 0; i < sensor_count; i++){
 			  integrator_1[i] += current_buffer[i];
 			  integrator_2[i] += integrator_1[i];
 			  integrator_out[i] += integrator_2[i];
 		  }
-		  	/***Raw sampling buffer is now decoupled from processing **/
-		  //perform decimation and feed forward (NOTE: processing task may 'fall behind' here)
-		  	 if ((decimation_count % DECIMATED_LOGGING_FACTOR) == 0){
-		  		int line_len = 0;
-		  		get_timestamp_interface(timestamp,50);
-		  		line_len+= snprintf(line_buf, sizeof(line_buf),"%s,",timestamp);
-		  		 for (int i = 0; i < sensor_count; i++){
-		  			uint32_t comb1 = integrator_out[i] - prev_integrator_out[i];
-		  			prev_integrator_out[i] = integrator_out[i];
+		  if ((decimation_counter % DECIMATED_LOGGING_FACTOR) == 0){
+		  int line_len = 0;
+		  //writes the all the sensor data collected in the current timestep to the line buffer
+		  for (int i = 0; i < sensor_count; i++){
+			  uint32_t comb1 = integrator_out[i] - prev_integrator_out[i];
+				prev_integrator_out[i] = integrator_out[i];
 
-		  			uint32_t comb2 = comb1 - prev_comb1[i];
-		  			prev_comb1[i] = comb1;
+				uint32_t comb2 = comb1 - prev_comb1[i];
+				prev_comb1[i] = comb1;
 
-		  			uint32_t comb3 = comb2 - prev_comb2[i];
-		  			prev_comb2[i] = comb2;
+				uint32_t comb3 = comb2 - prev_comb2[i];
+				prev_comb2[i] = comb2;
 
-		  			//normalize and process output
-		  			uint32_t final_result = (comb3 >> GAIN_COMP);
-		  			calibrated_sensor_vals[i] = (final_result*0.001)*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
-		  			line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_sensor_vals[i]);
-		  		 }
-		  		line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
-		  		 //only add the new line if it doesn't cause an overflow
-				  if (sd_card_pos+line_len <= sizeof(sdcard_data)){
-					  memcpy(sdcard_data+sd_card_pos, line_buf, line_len);
-					  sd_card_pos += line_len;
-					  log_count++;
-					  samples_collected++;
-					  }
-				  //otherwise, we just write what we have to the sd card first
-				  else{
-					  log_count = 20;
-				  }
-				  if (log_count == 20){
-		#ifndef TEST_LOGIC
-					  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
-		#endif
-					  //clear the sd write buffer for the next cycle
-					  sd_card_pos = 0;
-					  log_count = 0;
-				  }
-				  //Log whenever 1000 samples have been collected and sync to sd card
-				  if ((samples_collected % 1000) == 0){
-						  get_timestamp_interface(timestamp, 50);
-						  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
-						  osMutexAcquire(loggingMutexHandle, osWaitForever);
-		  #ifndef TEST_LOGIC
-						  fres = append_file_interface(&log_file, data_log, strlen(data_log));
-						  f_sync(&data_file);
-						  f_sync(&log_file);
-		  #endif
-						  osMutexRelease(loggingMutexHandle);
-						  }
-				  //idk if we want to add another filter for this
-		  		 if (decimation_count == 0){
-		  			 memcpy(telem_snapshot.cal_sensor_vals, calibrated_sensor_vals, sensor_count*sizeof(float));
-		  			 osMutexAcquire(driversMutexHandle, 100U);
-		  			 memcpy(telem_snapshot.driver_states, driver_states, driver_count*sizeof(int));
-		  			 osMutexRelease(driversMutexHandle);
-		  		 }
-		  	 }
+				//normalize and process output
+				uint32_t final_result = (comb3 >> GAIN_COMP);
+			  calibrated_vals[i] = (final_result*0.001)*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
+			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_vals[i]);
+		  }
+		  //signal to the collection task that it has consumed a buffer
+		  //osThreadFlagsSet(collectionTaskHandle,BUFFER_CONSUMED);
+		  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "\r\n");
+		  //only add the new line if it doesn't cause an overflow
+		  if (sd_card_pos+line_len < sizeof(sdcard_data)){
+			  memcpy(sdcard_data+sd_card_pos, line_buf, line_len);
+			  sd_card_pos += line_len;
+			  log_count++;
+			  samples_collected++;
+			  }
+		  //otherwise, we just write what we have to the sd card first
+		  else{
+			  log_count = 20;
+		  }
+		  if (log_count == 20){
+		  osMutexAcquire(loggingMutexHandle, osWaitForever);
+ #ifndef TEST_LOGIC
+		  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
+ #endif
+		  osMutexRelease(loggingMutexHandle);
+		  //clear the sd write buffer for the next cycle
+		  sd_card_pos = 0;
+		  log_count = 0;
+	  }
 
-	 }
-	  osDelay(1);
+		  //update snapshot at 8Hz
+		  if (decimation_counter == 0){
+			  osMutexAcquire(telemdataMutexHandle,10);
+			  memcpy(telem_snapshot.sensor_vals,calibrated_vals, sensor_count*sizeof(float));
+			  osMutexRelease(telemdataMutexHandle);
+		  }
+		  //Log whenever 1000 samples have been collected
+		  if ((samples_collected % 1000) == 0){
+			  get_timestamp_interface(timestamp, 50);
+			  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
+			  osMutexAcquire(loggingMutexHandle, osWaitForever);
+   #ifndef TEST_LOGIC
+			  fres = append_file_interface(&log_file, data_log, strlen(data_log));
+   #endif
+			  osMutexRelease(loggingMutexHandle);
+
+		  }
+		  //flush cache back to sd card every 10 seconds
+   sync_count = (sync_count + 1) % (10*sampling_freq_ign);
+		  if (sync_count == 0){
+		  }
+		  osMutexAcquire(loggingMutexHandle, osWaitForever);
+   #ifndef TEST_LOGIC
+		  /*sync data to SD card every second*/
+			  f_sync(&data_file);
+			  f_sync(&log_file);
+	#endif
+		  osMutexRelease(loggingMutexHandle);
+	  }
+	  }
+	  }
+
+    osDelay(1);
   }
   /* USER CODE END StartProcessingTask */
-}
+
 
 /* USER CODE BEGIN Header_StartShutdownTask */
 /**
@@ -530,21 +552,25 @@ void StartShutdownTask(void *argument)
 
 	  	/*Waits for processing to stop*/
 	  	stoppedLogging_flag = osThreadFlagsWait(LOGGING_STOPPED, osFlagsWaitAny, osWaitForever);
+
 	  	close_file_interface(&data_file);
 	  	close_file_interface(&log_file);
 	  	unmount_sd_interface();
 	  	if (processingTaskHandle != NULL){
 	  		osThreadTerminate(processingTaskHandle);
 	  	}
+	  	if (shutdownTaskHandle != NULL){
+			osThreadTerminate(shutdownTaskHandle);
+		}
 	  	if (serverTaskHandle != NULL){
-	  		osThreadTerminate(serverTaskHandle);
-	  	}
+			osThreadTerminate(serverTaskHandle);
+		}
 	  	if (cmdHandlingTaskHandle != NULL){
 	  		osThreadTerminate(cmdHandlingTaskHandle);
 	  	}
 	  	if (ignition_timer != NULL){
-	  		osTimerDelete(ignition_timer);
-	  	}
+			osTimerDelete(ignition_timer);
+		}
 	  	sprintf(TxBuffer, "All tasks closed\r\n");
 	  	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	  	osThreadExit();
@@ -555,6 +581,8 @@ void StartShutdownTask(void *argument)
 
 /* Private application code --------------------------------------------------*/
 /* USER CODE BEGIN Application */
+
+
 void vApplicationStackOverflowHook( TaskHandle_t xTask,
                                     char *pcTaskName ){
 	sprintf(TxBuffer, "%s\r\n", pcTaskName);
@@ -592,7 +620,9 @@ static void fn(struct mg_connection *c, int ev, void *ev_data) {
     	  osMessageQueueReset(cmdMessageQueueHandle);
       }
       osMessageQueuePut(cmdMessageQueueHandle, &cmd,0U, 0U);
+
   }
+
 }
 
 void mg_random(void *buf, size_t len) {  // Use on-board RNG
@@ -621,19 +651,17 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
     HAL_IncTick();
   }
   /* USER CODE BEGIN Callback 1 */
-  /*Sampling timer: collects the data from the ADC*/
   if (htim->Instance == TIM14){
 	  int curr_channel = sensor_list[sample_count%sensor_count].channel;
-	  	tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
-	  	tx[1] = (curr_channel & 0x03) << 6;
-	  	tx[2] = 0x00;
+	tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
+	tx[1] = (curr_channel & 0x03) << 6;
+	tx[2] = 0x00;
 
-	  	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
-	  	HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
+	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
+	HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
   }
   if (htim->Instance == TIM13){
 	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
-
   }
   if (htim->Instance == TIM11){
 	  osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
@@ -641,8 +669,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 
   /* USER CODE END Callback 1 */
 }
-/*Retrieves the data from the ADC and writes it to the ping pong buffer*/
-
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 	if (hspi->Instance == SPI1){
 		HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_SET);
@@ -652,11 +678,9 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 		//notify processing task if either of the ping pong buffers is full
 		if (sample_count == sensor_count){
 			osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
-			decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		}
 		else if (sample_count == 0){
 			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
-			decimation_count = (decimation_count+1) % DECIMATED_TELEMETRY_FACTOR;
 		}
 	}
 }
@@ -664,7 +688,7 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 static void ignition_timer_Callback(void *argument){
 	TELEMQUEUE_OBJ_T ign_telem;
 	if (ignition_count > 0){
-		sprintf(ign_telem.telem_buf, "IGNITION in %d\r\n", ignition_count);
+		sprintf(ign_telem.telem_buf, "{\"console\" : \"IGNITION in %d\"}", ignition_count);
 		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 		ignition_count--;
 		osTimerStart(ignition_timer, 1000U);
@@ -672,14 +696,15 @@ static void ignition_timer_Callback(void *argument){
 	else if (ignition_count == 0){
 		HAL_GPIO_WritePin(IGN_GPIO_Port, IGN_Pin, GPIO_PIN_SET);
 		ignition_count = 10;
-		sprintf(ign_telem.telem_buf,"IGNITION IN PROGRESS\r\n");
+		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		sprintf(ign_telem.telem_buf,"{\"console\": \"IGNITION IN PROGRESS\"}");
 		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 	}
 }
+
 void add_datafile_header(){
 	int card_pos = 0;
 	data_header_str[0] = '\0';
-	card_pos += snprintf(data_header_str+card_pos, sizeof(data_header_str) - card_pos, "time,");
 	for (int i = 0; i < sensor_count; i++){
 		card_pos += snprintf(data_header_str+card_pos,sizeof(data_header_str) - card_pos,"%s,",
 							 sensor_list[i].name);
@@ -697,18 +722,6 @@ void add_datafile_header(){
 #ifndef TEST_LOGIC
 	append_file_interface(&data_file, data_header_str, card_pos);
 #endif
-}
-uint16_t get_drivercurr(driver drv){
-	uint8_t drv_tx[3];
-	uint8_t drv_rx[3];
-	 int curr_channel = drv.channel;
-	 drv_tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
-	 drv_tx[1] = (curr_channel & 0x03) << 6;
-	 drv_tx[2] = 0x00;
-	 HAL_GPIO_WritePin(GPIOF,drv.adc_cs, GPIO_PIN_RESET);
-	 HAL_SPI_TransmitReceive(&hspi2, drv_tx, drv_rx, 3,100);
-	 uint16_t adc_val = ((drv_rx[1] & 0xF) << 8) | drv_rx[2];
-	 return adc_val;
 }
 /* USER CODE END Application */
 

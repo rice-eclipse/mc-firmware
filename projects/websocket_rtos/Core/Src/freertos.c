@@ -117,6 +117,10 @@ const osMessageQueueAttr_t telemMessageQueue_attributes = {
   .name = "telemMessageQueue"
 };
 
+//ignition counter
+int ignition_count;
+osTimerId_t ignition_timer;
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -173,6 +177,7 @@ const osMutexAttr_t telemdataMutex_attributes = {
 /* USER CODE BEGIN FunctionPrototypes */
 static void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
+static void ignition_timer_Callback(void *argument);
 void add_datafile_header();
 /* USER CODE END FunctionPrototypes */
 
@@ -197,6 +202,7 @@ void MX_FREERTOS_Init(void) {
 	first_pass_completed = 0;
 	decimation_counter = 0;
 	sample_count = 0;
+	ignition_count = 10;
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
@@ -236,6 +242,7 @@ void StartDefaultTask(void *argument)
   serverTaskHandle = osThreadNew(StartServerTask, NULL, &serverTask_attributes);
   processingTaskHandle = osThreadNew(StartProcessingTask, NULL, &processingTask_attributes);
   shutdownTaskHandle = osThreadNew(StartShutdownTask, NULL, &shutdownTask_attributes);
+  ignition_timer = osTimerNew(ignition_timer_Callback, osTimerOnce,NULL, NULL);
    HAL_TIM_Base_Start_IT(&htim14);
    HAL_TIM_Base_Start_IT(&htim13);
    osThreadExit();
@@ -337,14 +344,16 @@ void StartCmdHandlingTask(void *argument)
 
 	if (stop_ignition_flag == 1){
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+		HAL_TIM_Base_Start_IT(&htim11);
 
 	}
 	else if (ignition_flag == 1){
 		//ignition_sequence();
-		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
+		osTimerStart(ignition_timer, 1000U);
+		//HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 1);
 		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
 		//start shutdown timer after ignition
-		HAL_TIM_Base_Start_IT(&htim11);
+		//HAL_TIM_Base_Start_IT(&htim11);
 
 	}
 	else if (actuation_flag == 1){
@@ -565,6 +574,9 @@ void StartShutdownTask(void *argument)
 	  	if (cmdHandlingTaskHandle != NULL){
 	  		osThreadTerminate(cmdHandlingTaskHandle);
 	  	}
+	  	if (ignition_timer != NULL){
+			osTimerDelete(ignition_timer);
+		}
 	  	sprintf(TxBuffer, "All tasks closed\r\n");
 	  	HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 	  	osThreadExit();
@@ -676,6 +688,23 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 		else if (sample_count == 0){
 			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
 		}
+	}
+}
+
+static void ignition_timer_Callback(void *argument){
+	TELEMQUEUE_OBJ_T ign_telem;
+	if (ignition_count > 0){
+		sprintf(ign_telem.telem_buf, "{\"console\" : \"IGNITION in %d\"}", ignition_count);
+		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
+		ignition_count--;
+		osTimerStart(ignition_timer, 1000U);
+	}
+	else if (ignition_count == 0){
+		HAL_GPIO_WritePin(IGN_GPIO_Port, IGN_Pin, GPIO_PIN_SET);
+		ignition_count = 10;
+		HAL_GPIO_TogglePin(GPIOB, LD2_Pin);
+		sprintf(ign_telem.telem_buf,"{\"console\": \"IGNITION IN PROGRESS\"}");
+		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 	}
 }
 

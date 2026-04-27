@@ -48,6 +48,7 @@ typedef struct {
     int driver_states[MAX_DRIVER_COUNT];
 } telemetry_snapshot_t;
 
+
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
@@ -61,6 +62,11 @@ typedef struct {
 #define STOP_LOGGING (1 << 5)
 #define SEND_NOW (1 << 7)
 #define BUFFER_CONSUMED (1 << 8)
+
+//Three stage CIC filter
+#define GAIN_COMP 9
+#define DECIMATED_LOGGING_FACTOR 8
+#define DECIMATED_TELEMETRY_FACTOR 125
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -99,6 +105,15 @@ FIL log_file;
 //adc data collection
 uint8_t tx[3];
 uint8_t rx[3];
+
+//CIC Filter buffers
+uint32_t integrator_1[MAX_SENSOR_COUNT];
+uint32_t integrator_2[MAX_SENSOR_COUNT];
+uint32_t integrator_out[MAX_SENSOR_COUNT];
+uint32_t prev_integrator_out[MAX_SENSOR_COUNT];
+uint32_t prev_comb1[MAX_SENSOR_COUNT];
+uint32_t prev_comb2[MAX_SENSOR_COUNT];
+
 //current sample in the current snapshot
 int sample_count;
 telemetry_snapshot_t telem_snapshot;
@@ -383,47 +398,6 @@ void StartCmdHandlingTask(void *argument)
   /* USER CODE END StartCmdHandlingTask */
 }
 
-/* USER CODE BEGIN Header_StartCollectionTask */
-/**
-* @brief Function implementing the collectionTask thread.
-* @param argument: Not used
-* @retval None
-*/
-/* USER CODE END Header_StartCollectionTask */
-void StartCollectionTask(void *argument)
-{
-  /* USER CODE BEGIN StartCollectionTask */
-
-
-  /* Infinite loop */
-  for(;;)
-  {
-	   osThreadFlagsWait(SAMPLE_NOW, osFlagsWaitAny, osWaitForever);
-	   	 int channel = sensor_list[sample_count%sensor_count].channel;
-	   	 int cs = sensor_list[sample_count%sensor_count].adc_cs;
-		 sensor_vals[sample_count] = get_mcp3208_adcval(channel, cs, &hspi1);
-		 			  //sprintf(TxBuffer,"recorded val: %f\r\n", sensor_vals[sample_count]);
-		 			  //HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
-
-		 sample_count = (sample_count + 1) % (sensor_count*2);
-
-		 //First Buffer has been filled
-		 if (sample_count == sensor_count){
-			 osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
-			 filled_buffer = &sensor_vals[0];
-		 }
-		 //second buffer filled
-		 else if (sample_count == 0){
-			 osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
-			 filled_buffer = &sensor_vals[sensor_count];
-			 first_pass_completed = 1;
-		 }
-
-    osDelay(1);
-  }
-  /* USER CODE END StartCollectionTask */
-}
-
 /* USER CODE BEGIN Header_StartProcessingTask */
 /**
 * @brief Function implementing the processingTask thread.
@@ -454,7 +428,7 @@ void StartProcessingTask(void *argument)
 	  			  	  	  	  	  	  	  	  osFlagsWaitAny, osWaitForever);
 
 	  //set the current buf pointer to the first part of the data buffer
-	  decimation_counter = (decimation_counter + 1)%125;
+	  decimation_counter = (decimation_counter + 1)%DECIMATED_TELEMETRY_FACTOR;
 	  if (processing_flag & FIRST_BUF_READY){
 		  current_buffer = &sensor_vals[0];
 	  }
@@ -469,12 +443,29 @@ void StartProcessingTask(void *argument)
 	  }
 	  //perform filtering and decimation and log data to sd card
 	  //1000Hz->125Hz
-	  else if ((decimation_counter % 8) == 0){
+	  else{
+		  //feed the values through the integrator chain
+		  for (int i = 0; i < sensor_count; i++){
+			  integrator_1[i] += current_buffer[i];
+			  integrator_2[i] += integrator_1[i];
+			  integrator_out[i] += integrator_2[i];
+		  }
+		  if ((decimation_counter % DECIMATED_LOGGING_FACTOR) == 0){
 		  int line_len = 0;
 		  //writes the all the sensor data collected in the current timestep to the line buffer
 		  for (int i = 0; i < sensor_count; i++){
-			  float temp = current_buffer[i]*0.001;
-			  calibrated_vals[i] = temp*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
+			  uint32_t comb1 = integrator_out[i] - prev_integrator_out[i];
+				prev_integrator_out[i] = integrator_out[i];
+
+				uint32_t comb2 = comb1 - prev_comb1[i];
+				prev_comb1[i] = comb1;
+
+				uint32_t comb3 = comb2 - prev_comb2[i];
+				prev_comb2[i] = comb2;
+
+				//normalize and process output
+				uint32_t final_result = (comb3 >> GAIN_COMP);
+			  calibrated_vals[i] = (final_result*0.001)*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
 			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_vals[i]);
 		  }
 		  //signal to the collection task that it has consumed a buffer
@@ -493,9 +484,9 @@ void StartProcessingTask(void *argument)
 		  }
 		  if (log_count == 20){
 		  osMutexAcquire(loggingMutexHandle, osWaitForever);
-#ifndef TEST_LOGIC
+ #ifndef TEST_LOGIC
 		  fres = append_file_interface(&data_file, sdcard_data,sd_card_pos);
-#endif
+ #endif
 		  osMutexRelease(loggingMutexHandle);
 		  //clear the sd write buffer for the next cycle
 		  sd_card_pos = 0;
@@ -513,28 +504,31 @@ void StartProcessingTask(void *argument)
 			  get_timestamp_interface(timestamp, 50);
 			  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
 			  osMutexAcquire(loggingMutexHandle, osWaitForever);
-  #ifndef TEST_LOGIC
+   #ifndef TEST_LOGIC
 			  fres = append_file_interface(&log_file, data_log, strlen(data_log));
-  #endif
+   #endif
 			  osMutexRelease(loggingMutexHandle);
 
 		  }
 		  //flush cache back to sd card every 10 seconds
-  sync_count = (sync_count + 1) % (10*sampling_freq_ign);
+   sync_count = (sync_count + 1) % (10*sampling_freq_ign);
 		  if (sync_count == 0){
 		  }
 		  osMutexAcquire(loggingMutexHandle, osWaitForever);
-  #ifndef TEST_LOGIC
+   #ifndef TEST_LOGIC
 		  /*sync data to SD card every second*/
 			  f_sync(&data_file);
 			  f_sync(&log_file);
 	#endif
 		  osMutexRelease(loggingMutexHandle);
 	  }
+	  }
+	  }
+
     osDelay(1);
   }
   /* USER CODE END StartProcessingTask */
-}
+
 
 /* USER CODE BEGIN Header_StartShutdownTask */
 /**

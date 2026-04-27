@@ -39,6 +39,10 @@ typedef struct{
 	uint8_t cmd_idx;
 } CMDQUEUE_OBJ_T;
 
+typedef struct{
+	char telem_buf[200];
+} TELEMQUEUE_OBJ_T;
+
 typedef struct {
     float sensor_vals[MAX_SENSOR_COUNT];
     int driver_states[MAX_DRIVER_COUNT];
@@ -108,6 +112,11 @@ osMessageQueueId_t cmdMessageQueueHandle;
 const osMessageQueueAttr_t cmdMessageQueue_attributes = {
   .name = "cmdMessageQueue"
 };
+osMessageQueueId_t telemMessageQueueHandle;
+const osMessageQueueAttr_t telemMessageQueue_attributes = {
+  .name = "telemMessageQueue"
+};
+
 /* USER CODE END Variables */
 /* Definitions for defaultTask */
 osThreadId_t defaultTaskHandle;
@@ -194,6 +203,7 @@ void MX_FREERTOS_Init(void) {
   loggingMutexHandle = osMutexNew(&loggingMutex_attributes);
   /* USER CODE BEGIN RTOS_QUEUES */
  	cmdMessageQueueHandle = osMessageQueueNew (4, sizeof(CMDQUEUE_OBJ_T), &cmdMessageQueue_attributes);
+ 	telemMessageQueueHandle = osMessageQueueNew(15, sizeof(TELEMQUEUE_OBJ_T), &telemMessageQueue_attributes);
    /* USER CODE END RTOS_QUEUES */
   /* creation of driversMutex */
   driversMutexHandle = osMutexNew(&driversMutex_attributes);
@@ -247,6 +257,8 @@ void StartDefaultTask(void *argument)
 void StartServerTask(void *argument)
 {
   /* USER CODE BEGIN StartServerTask */
+	TELEMQUEUE_OBJ_T telem;
+	osStatus_t telem_queue_status;
 	sprintf(ip_addr, "http://%s:%d",host_ip,port);
 	uint32_t sending_flag;
 	 struct mg_mgr mgr;
@@ -259,6 +271,7 @@ void StartServerTask(void *argument)
 	  //package the data in json for the websocket and send at each sending interval
 	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 	  if (sending_flag == SEND_NOW){
+		  telem_queue_status = osMessageQueueGet(telemMessageQueueHandle, &telem, NULL, 0);
 		  osMutexAcquire(driversMutexHandle, 100U);
 		  memcpy(telem_snapshot.driver_states, driver_states, driver_count*sizeof(float));
 		  osMutexRelease(driversMutexHandle);
@@ -268,6 +281,10 @@ void StartServerTask(void *argument)
 		  for (struct mg_connection *client = mgr.conns; client != NULL; client = client->next){
 			  if (client->data[0] == 'W'){
 				  mg_ws_send(client, (void *)sensor_data_str,strlen(sensor_data_str), WEBSOCKET_OP_TEXT);
+				  while (telem_queue_status == osOK){
+					 mg_ws_send(client, (void *)telem.telem_buf,strlen(telem.telem_buf), WEBSOCKET_OP_TEXT);
+					 telem_queue_status = osMessageQueueGet(telemMessageQueueHandle, &telem, NULL, 0);
+				 }
 			  }
 		  }
 
@@ -295,6 +312,7 @@ void StartCmdHandlingTask(void *argument)
 	int direction;
 	static char cmd_timestamp[50];
 	CMDQUEUE_OBJ_T cmd;
+	TELEMQUEUE_OBJ_T telem;
 #ifndef TEST_LOGIC
 	FRESULT fres;
 #endif
@@ -319,6 +337,7 @@ void StartCmdHandlingTask(void *argument)
 
 	if (stop_ignition_flag == 1){
 		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+
 	}
 	else if (ignition_flag == 1){
 		//ignition_sequence();
@@ -338,11 +357,16 @@ void StartCmdHandlingTask(void *argument)
 
 			get_timestamp_interface(cmd_timestamp,50);
 			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
+			sprintf(telem.telem_buf,
+			        "{\"console\":\"Actuating driver id %d - %d\"}",
+			        driver_list[driver_id].GPIO_Pin,
+			        direction);
 				osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC
 			  fres = append_file_interface(&log_file, cmd_log, strlen(cmd_log));
 #endif
 	osMutexRelease(loggingMutexHandle);
+	osMessageQueuePut(telemMessageQueueHandle, &telem, 0U,0U);
 		}
 	}
     osDelay(1);

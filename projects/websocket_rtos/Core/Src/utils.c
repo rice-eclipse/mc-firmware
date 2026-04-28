@@ -174,17 +174,9 @@ int parse_config(const char *config_str,
 		        *driver_count = curr_driver;
 		    }
 		    ignition_obj = cJSON_GetObjectItemCaseSensitive(config_json, "ignition");
-		    if (ignition_obj != NULL) {
-		        char *gpio_port = cJSON_GetObjectItemCaseSensitive(ignition_obj, "gpio_port")->valuestring;
-		        if (strcmp(gpio_port, "GPIOA") == 0) {
-		            ignition->GPIO_Port = GPIOA;
-		        } else if (strcmp(gpio_port, "GPIOB") == 0) {
-		            ignition->GPIO_Port = GPIOB;
-		        } else {
-		            ignition->GPIO_Port = GPIOC;
-		        }
-		        ignition->GPIO_Pin = IGN_Pin;
-		    }
+			ignition->GPIO_Port = GPIOF;
+			ignition->GPIO_Pin = IGN_Pin;
+
 
 		    monitors = cJSON_GetObjectItemCaseSensitive(config_json, "monitors");
 		    if (cJSON_IsArray(monitors)) {

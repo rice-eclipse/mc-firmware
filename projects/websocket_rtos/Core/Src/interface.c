@@ -506,7 +506,7 @@ void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_va
 	json_len += snprintf(json_buf + json_len, json_buf_size - json_len, "{");
 	// inserts first part of each sensor json file
 	const char *sensor_types[] = {"tcs", "pts", "lcs"};
-	const char groups[] = {'t', 'p', 'l'};
+	const char groups[] = {'T', 'P', 'L'};
 
 	for (int i = 0; i < 3; i++) {
 	    json_len += snprintf(json_buf + json_len, json_buf_size - json_len,

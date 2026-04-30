@@ -289,7 +289,7 @@ void StartServerTask(void *argument)
   /* Infinite loop */
   for(;;)
   {
-	  mg_mgr_poll(&mgr, 10);
+	  mg_mgr_poll(&mgr, 1);
 	  //package the data in json for the websocket and send at each sending interval
 	  sending_flag = osThreadFlagsWait(SEND_NOW, osFlagsWaitAny, 0);
 	  if (sending_flag == SEND_NOW){
@@ -357,8 +357,11 @@ void StartCmdHandlingTask(void *argument)
 		osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
 	}
 
-	if (stop_ignition_flag == 1){
-		HAL_GPIO_WritePin(ignition.GPIO_Port, ignition.GPIO_Pin, 0);
+	else if (stop_ignition_flag == 1){
+		HAL_GPIO_WritePin(IGN_GPIO_Port, IGN_Pin, GPIO_PIN_RESET);
+		osTimerStop(ignition_timer);
+		ignition_count = 10;
+		HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
 		HAL_TIM_Base_Start_IT(&htim11);
 
 	}
@@ -495,6 +498,7 @@ void StartProcessingTask(void *argument)
 
 		  //update snapshot at 8Hz
 		  if (decimation_counter == 0){
+
 			  osMutexAcquire(telemdataMutexHandle,10);
 			  memcpy(telem_snapshot.sensor_vals,calibrated_vals, sensor_count*sizeof(float));
 			  osMutexRelease(telemdataMutexHandle);
@@ -559,9 +563,6 @@ void StartShutdownTask(void *argument)
 	  	if (processingTaskHandle != NULL){
 	  		osThreadTerminate(processingTaskHandle);
 	  	}
-	  	if (shutdownTaskHandle != NULL){
-			osThreadTerminate(shutdownTaskHandle);
-		}
 	  	if (serverTaskHandle != NULL){
 			osThreadTerminate(serverTaskHandle);
 		}

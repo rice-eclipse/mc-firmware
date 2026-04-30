@@ -41,7 +41,6 @@ int parse_config(const char *config_str,
 		    const cJSON* sensor_obj = NULL;
 		    const cJSON *drivers = NULL;
 		    const cJSON *driver_obj = NULL;
-		    const cJSON *ignition_obj = NULL;
 		    const cJSON *monitors = NULL;
 		    const cJSON *monitor_obj = NULL;
 		    int status = 0;
@@ -134,15 +133,8 @@ int parse_config(const char *config_str,
 		            char *enabled = cJSON_GetObjectItemCaseSensitive(driver_obj, "enabled")->valuestring;
 		            if (strcmp(enabled,"true") == 0) {
 		                driver new_driver;
-		                char *gpio_port = cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_port")->valuestring;
-		                if (strcmp(gpio_port, "GPIOF") == 0) {
-		                    new_driver.GPIO_Port = GPIOF;
-		                } else if (strcmp(gpio_port, "GPIOB") == 0) {
-		                    new_driver.GPIO_Port = GPIOB;
-		                } else {
-		                    new_driver.GPIO_Port = GPIOC;
-		                }
 
+		                new_driver.GPIO_Port = GPIOF;
 		                gpio_pin = cJSON_GetObjectItemCaseSensitive(driver_obj, "gpio_pin")->valueint;
 
 		                switch (gpio_pin){
@@ -173,7 +165,6 @@ int parse_config(const char *config_str,
 		        //update the driver count with the true number of drivers
 		        *driver_count = curr_driver;
 		    }
-		    ignition_obj = cJSON_GetObjectItemCaseSensitive(config_json, "ignition");
 			ignition->GPIO_Port = GPIOF;
 			ignition->GPIO_Pin = IGN_Pin;
 

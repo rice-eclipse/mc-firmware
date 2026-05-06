@@ -361,8 +361,8 @@ void StartCmdHandlingTask(void *argument)
 		HAL_GPIO_WritePin(IGN_GPIO_Port, IGN_Pin, GPIO_PIN_RESET);
 		osTimerStop(ignition_timer);
 		ignition_count = 10;
-		sprintf(ign_telem.telem_buf,"{\"console\": \"IGNITION CANCELLED\"}");
-		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
+		sprintf(telem.telem_buf,"{\"console\": \"IGNITION CANCELLED\"}");
+		osMessageQueuePut(telemMessageQueueHandle, &telem,0U,0U);
 		HAL_GPIO_TogglePin(GPIOB, LD3_Pin);
 		HAL_TIM_Base_Start_IT(&htim11);
 
@@ -517,7 +517,7 @@ void StartProcessingTask(void *argument)
 
 		  }
 		  //flush cache back to sd card every 10 seconds
-   sync_count = (sync_count + 1) % (10*sampling_freq_ign);
+   sync_count = (sync_count + 1) % (10000);
 		  if (sync_count == 0){
 		  }
 		  osMutexAcquire(loggingMutexHandle, osWaitForever);

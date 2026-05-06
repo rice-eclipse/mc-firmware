@@ -96,7 +96,7 @@ int parse_config(const char *config_str,
 							(float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_intercept")->valuedouble;
 						new_sensor.calibration_slope =
 							(float)cJSON_GetObjectItemCaseSensitive(sensor_obj, "calibration_slope")->valuedouble;
-
+						new_sensor.sensor_id = cJSON_GetObjectItemCaseSensitive(sensor_obj,"sensor_id")->valueint;
 						switch (cs_pin){
 						case 1:
 							new_sensor.adc_cs = ADC1_CS_Pin;

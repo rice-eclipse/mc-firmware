@@ -385,10 +385,10 @@ void StartCmdHandlingTask(void *argument)
 			osMutexRelease(driversMutexHandle);
 
 			get_timestamp_interface(cmd_timestamp,50);
-			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_list[driver_id].GPIO_Pin, direction);
+			sprintf(cmd_log, "%s Actuating driver id  %d - %d\r\n",cmd_timestamp, driver_id, direction);
 			sprintf(telem.telem_buf,
 			        "{\"console\":\"Actuating driver id %d - %d\"}",
-			        driver_list[driver_id].GPIO_Pin,
+			        driver_id,
 			        direction);
 				osMutexAcquire(loggingMutexHandle, osWaitForever);
 #ifndef TEST_LOGIC

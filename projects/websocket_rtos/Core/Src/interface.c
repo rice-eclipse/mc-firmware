@@ -519,14 +519,14 @@ void sensor_message_interface(char *json_buf, int json_buf_size,float *sensor_va
 	            // inserts comma only after first sensor in each sensor group
 	            if (first_in_group) {
 	                json_len += snprintf(json_buf + json_len, json_buf_size - json_len,
-	                        "{\"sensor_id\":%d,\"reading\":%d}",
-	                        sensor_list[j].channel, (int)(sensor_vals[j] * 1000));
+	                        "{\"sensor_id\":%d,\"reading\":%f}",
+	                        sensor_list[j].sensor_id,sensor_vals[j]);
 	                first_in_group = 0;
 	            }
 	            else {
 	                json_len += snprintf(json_buf + json_len, json_buf_size - json_len,
-	                        ",{\"sensor_id\":%d,\"reading\":%d}",
-	                        sensor_list[j].channel, (int)(sensor_vals[j] * 1000));
+	                        ",{\"sensor_id\":%d,\"reading\":%f}",
+	                        sensor_list[j].sensor_id,sensor_vals[j]);
 	            }
 	        }
 	    }

@@ -423,6 +423,7 @@ void StartProcessingTask(void *argument)
 	/*We sync the file to the sd card every second*/
 	int sync_count = 0;
 	int log_count =0;
+	int32_t prev_final_result = 0;
 #ifndef TEST_LOGIC
 	FRESULT fres;
 #endif
@@ -469,7 +470,13 @@ void StartProcessingTask(void *argument)
 				prev_comb2[i] = comb2;
 
 				//normalize and process output
-				uint32_t final_result = (comb3 >> GAIN_COMP);
+				int32_t final_result = (int32_t)(comb3 >> GAIN_COMP);
+				if (final_result > 4095){
+					final_result = prev_final_result;
+				}
+				else{
+					prev_final_result = final_result;
+				}
 			  calibrated_vals[i] = (final_result*0.001)*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
 			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_vals[i]);
 		  }
@@ -499,7 +506,7 @@ void StartProcessingTask(void *argument)
 	  }
 
 		  //update snapshot at 8Hz
-		  if (decimation_counter == 0){
+		  if (decimation_counter% (DECIMATED_LOGGING_FACTOR*4) == 0){
 
 			  osMutexAcquire(telemdataMutexHandle,10);
 			  memcpy(telem_snapshot.sensor_vals,calibrated_vals, sensor_count*sizeof(float));
@@ -659,7 +666,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 	tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
 	tx[1] = (curr_channel & 0x03) << 6;
 	tx[2] = 0x00;
-
 	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
 	HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
   }

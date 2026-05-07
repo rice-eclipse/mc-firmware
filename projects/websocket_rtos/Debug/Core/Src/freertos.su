@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 ../Core/Src/freertos.c:216:6:MX_FREERTOS_Init	8	static
 ../Core/Src/freertos.c:246:6:StartDefaultTask	16	static
 ../Core/Src/freertos.c:282:6:StartServerTask	296	static
@@ -12,3 +13,18 @@
 ../Core/Src/freertos.c:694:13:ignition_timer_Callback	216	static
 ../Core/Src/freertos.c:711:6:collect_adc_vals	24	static
 ../Core/Src/freertos.c:728:6:add_datafile_header	24	static
+=======
+../Core/Src/freertos.c:214:6:MX_FREERTOS_Init	8	static
+../Core/Src/freertos.c:243:6:StartDefaultTask	16	static
+../Core/Src/freertos.c:279:6:StartServerTask	296	static
+../Core/Src/freertos.c:326:6:StartCmdHandlingTask	464	static
+../Core/Src/freertos.c:413:6:StartProcessingTask	96	static
+../Core/Src/freertos.c:553:6:StartShutdownTask	24	static
+../Core/Src/freertos.c:596:6:vApplicationStackOverflowHook	16	static
+../Core/Src/freertos.c:602:13:fn	256	static
+../Core/Src/freertos.c:638:6:mg_random	24	static
+../Core/Src/freertos.c:654:6:HAL_TIM_PeriodElapsedCallback	24	static
+../Core/Src/freertos.c:682:6:HAL_SPI_TxRxCpltCallback	16	static
+../Core/Src/freertos.c:698:13:ignition_timer_Callback	216	static
+../Core/Src/freertos.c:715:6:add_datafile_header	24	static
+>>>>>>> new_sampling_debugging

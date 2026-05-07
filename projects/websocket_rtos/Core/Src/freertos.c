@@ -610,7 +610,7 @@ void StartShutdownTask(void *argument)
 void vApplicationStackOverflowHook( TaskHandle_t xTask,
                                     char *pcTaskName ){
 	sprintf(TxBuffer, "%s\r\n", pcTaskName);
-	 HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
+	 %HAL_UART_Transmit(&huart3, (uint8_t *)TxBuffer, strlen(TxBuffer), HAL_MAX_DELAY);
 }
 
 static void fn(struct mg_connection *c, int ev, void *ev_data) {

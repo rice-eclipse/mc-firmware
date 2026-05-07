@@ -105,6 +105,7 @@ FIL log_file;
 //adc data collection
 uint8_t tx[3];
 uint8_t rx[3];
+int collection_in_progress;
 
 //CIC Filter buffers
 uint32_t integrator_1[MAX_SENSOR_COUNT];
@@ -165,6 +166,7 @@ const osThreadAttr_t processingTask_attributes = {
   .stack_size = 512 * 4,
   .priority = (osPriority_t) osPriorityNormal,
 };
+
 /* Definitions for shutdownTask */
 osThreadId_t shutdownTaskHandle;
 const osThreadAttr_t shutdownTask_attributes = {
@@ -194,6 +196,7 @@ static void fn(struct mg_connection *c, int ev, void *ev_data);
 void mg_random(void *buf, size_t len);
 static void ignition_timer_Callback(void *argument);
 void add_datafile_header();
+void collect_adc_vals(int channel_idx);
 /* USER CODE END FunctionPrototypes */
 
 void StartDefaultTask(void *argument);
@@ -218,6 +221,7 @@ void MX_FREERTOS_Init(void) {
 	decimation_counter = 0;
 	sample_count = 0;
 	ignition_count = 10;
+	collection_in_progress = 0;
   /* USER CODE END Init */
   /* Create the mutex(es) */
   /* creation of loggingMutex */
@@ -470,6 +474,9 @@ void StartProcessingTask(void *argument)
 
 				//normalize and process output
 				uint32_t final_result = (comb3 >> GAIN_COMP);
+				if (final_result > 4095){
+					continue;
+				}
 			  calibrated_vals[i] = (final_result*0.001)*sensor_list[i].calibration_slope + sensor_list[i].calibration_int;
 			  line_len += snprintf(line_buf + line_len, sizeof(line_buf)-line_len, "%.3f,",calibrated_vals[i]);
 		  }
@@ -500,7 +507,6 @@ void StartProcessingTask(void *argument)
 
 		  //update snapshot at 8Hz
 		  if (decimation_counter == 0){
-
 			  osMutexAcquire(telemdataMutexHandle,10);
 			  memcpy(telem_snapshot.sensor_vals,calibrated_vals, sensor_count*sizeof(float));
 			  osMutexRelease(telemdataMutexHandle);
@@ -655,22 +661,15 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   }
   /* USER CODE BEGIN Callback 1 */
   if (htim->Instance == TIM14){
-	  int curr_channel = sensor_list[sample_count%sensor_count].channel;
-	tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
-	tx[1] = (curr_channel & 0x03) << 6;
-	tx[2] = 0x00;
-
-	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
-	HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
-  }
-  if (htim->Instance == TIM13){
-	  osThreadFlagsSet(serverTaskHandle, SEND_NOW);
-  }
-  if (htim->Instance == TIM11){
-	  osThreadFlagsSet(shutdownTaskHandle, SHUTDOWN);
-  }
+	  //ony initiate a collection if one isn't already in progress
+	  if (collection_in_progress == 0){
+		  collection_in_progress = 1;
+		  sample_count = 0;
+		  collect_adc_vals(0);
+	  }
 
   /* USER CODE END Callback 1 */
+  }
 }
 void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 	if (hspi->Instance == SPI1){
@@ -680,10 +679,15 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi){
 
 		//notify processing task if either of the ping pong buffers is full
 		if (sample_count == sensor_count){
+			collection_in_progress = 0;
 			osThreadFlagsSet(processingTaskHandle, FIRST_BUF_READY);
 		}
 		else if (sample_count == 0){
+			collection_in_progress = 0;
 			osThreadFlagsSet(processingTaskHandle, SECOND_BUF_READY);
+		}
+		else{
+			collect_adc_vals(sample_count);
 		}
 	}
 }
@@ -704,6 +708,23 @@ static void ignition_timer_Callback(void *argument){
 		osMessageQueuePut(telemMessageQueueHandle, &ign_telem,0U,0U);
 	}
 }
+
+void collect_adc_vals(int channel_idx){
+	  int curr_channel = sensor_list[channel_idx].channel;
+		tx[0] = 0x06 | ((curr_channel & 0x04) >> 2);
+		tx[1] = (curr_channel& 0x03) << 6;
+		tx[2] = 0x00;
+
+		//makes sure the indexes of this function and the spi callback are in sync
+		sample_count = channel_idx;
+		HAL_GPIO_WritePin(GPIOF,sensor_list[channel_idx].adc_cs, GPIO_PIN_RESET);
+		 HAL_StatusTypeDef status = HAL_SPI_TransmitReceive_IT(&hspi1, tx, rx, 3);
+		 //stop the current write if anything went wrong
+		 if (status != HAL_OK){
+			 HAL_GPIO_WritePin(GPIOF,sensor_list[channel_idx].adc_cs, GPIO_PIN_SET);
+			 collection_in_progress = 0;
+		 }
+	  }
 
 void add_datafile_header(){
 	int card_pos = 0;

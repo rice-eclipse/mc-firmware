@@ -80,6 +80,7 @@ char ip_addr[100];
 uint8_t current_cmd_idx;
 static char TxBuffer[300];
 
+
 static char sensor_data_str[4000];
 //Ping-pong buffer for data to write to sd
 uint16_t sensor_vals[2*MAX_SENSOR_COUNT];
@@ -514,6 +515,7 @@ void StartProcessingTask(void *argument)
 		  }
 		  //Log whenever 1000 samples have been collected
 		  if ((samples_collected % 1000) == 0){
+
 			  get_timestamp_interface(timestamp, 50);
 			  sprintf(data_log,"%s %lu samples obtained\r\n",timestamp,samples_collected);
 			  osMutexAcquire(loggingMutexHandle, osWaitForever);
@@ -526,14 +528,15 @@ void StartProcessingTask(void *argument)
 		  //flush cache back to sd card every 10 seconds
    sync_count = (sync_count + 1) % (10000);
 		  if (sync_count == 0){
+			  osMutexAcquire(loggingMutexHandle, osWaitForever);
+			 #ifndef TEST_LOGIC
+				  /*sync data to SD card every second*/
+					  f_sync(&data_file);
+					  f_sync(&log_file);
+			#endif
+				  osMutexRelease(loggingMutexHandle);
 		  }
-		  osMutexAcquire(loggingMutexHandle, osWaitForever);
-   #ifndef TEST_LOGIC
-		  /*sync data to SD card every second*/
-			  f_sync(&data_file);
-			  f_sync(&log_file);
-	#endif
-		  osMutexRelease(loggingMutexHandle);
+
 	  }
 	  }
 	  }

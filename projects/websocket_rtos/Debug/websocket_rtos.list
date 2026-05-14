@@ -6035,7 +6035,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
  8002dd8:	4b21      	ldr	r3, [pc, #132]	@ (8002e60 <HAL_TIM_PeriodElapsedCallback+0xf0>)
  8002dda:	2200      	movs	r2, #0
  8002ddc:	709a      	strb	r2, [r3, #2]
-
 	HAL_GPIO_WritePin(GPIOF,sensor_list[sample_count%sensor_count].adc_cs, GPIO_PIN_RESET);
  8002dde:	4b1d      	ldr	r3, [pc, #116]	@ (8002e54 <HAL_TIM_PeriodElapsedCallback+0xe4>)
  8002de0:	681b      	ldr	r3, [r3, #0]

@@ -526,8 +526,8 @@ void StartProcessingTask(void *argument)
 
 		  }
 		  //flush cache back to sd card every 10 seconds
-   sync_count = (sync_count + 1) % (10000);
-		  if (sync_count == 0){
+   sync_count = (sync_count + 1) % (100);
+		  if (sync_count == 0){}
 			  osMutexAcquire(loggingMutexHandle, osWaitForever);
 			 #ifndef TEST_LOGIC
 				  /*sync data to SD card every second*/
@@ -535,7 +535,7 @@ void StartProcessingTask(void *argument)
 					  f_sync(&log_file);
 			#endif
 				  osMutexRelease(loggingMutexHandle);
-		  }
+
 
 	  }
 	  }

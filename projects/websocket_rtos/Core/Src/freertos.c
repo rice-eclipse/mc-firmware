@@ -67,6 +67,7 @@ typedef struct {
 #define GAIN_COMP 9
 #define DECIMATED_LOGGING_FACTOR 8
 #define DECIMATED_TELEMETRY_FACTOR 125
+#define SD_SYNC_LOG_LINES 1250
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -525,16 +526,16 @@ void StartProcessingTask(void *argument)
 			  osMutexRelease(loggingMutexHandle);
 
 		  }
-		  //flush cache back to sd card every 10 seconds
-   sync_count = (sync_count + 1) % (100);
-		  if (sync_count == 0){}
+		  //flush cache back to sd card every 10 seconds at 125 Hz logging
+		  sync_count = (sync_count + 1) % SD_SYNC_LOG_LINES;
+		  if (sync_count == 0){
 			  osMutexAcquire(loggingMutexHandle, osWaitForever);
 			 #ifndef TEST_LOGIC
-				  /*sync data to SD card every second*/
 					  f_sync(&data_file);
 					  f_sync(&log_file);
 			#endif
 				  osMutexRelease(loggingMutexHandle);
+		  }
 
 
 	  }

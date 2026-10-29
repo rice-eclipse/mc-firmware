@@ -1,7 +1,33 @@
 # Firmware for the Karca Engine Control Box
 
 ## Project status
-This project is under active development. Currently, the firmware is being tested on the [NUCLEO-F207](https://www.st.com/en/evaluation-tools/nucleo-f207zg.html) development board. We will eventually migrate to the [STM32F407VET6](https://www.digikey.com/en/products/detail/stmicroelectronics/STM32F407VET6/2793093)
+This project will not be a part of Eclipse's future mission control plans. It's being refactored as a personal project.
+
+### Improvement Scope
+**firmware performance + additional features**
+- Replace the external ADC (plus the SPI polling interface) with DMA using the internal ADCs of the STM32F429/F407 MCU
+
+- Replace HAL with the LL drivers (less code bloat hopefully)
+
+- Log data in binary format instead of expensive csv
+
+- Replace the websocket interface with a simpler tcp socker (no need to integrate with quonkboard anymore)
+
+- Stretch objective: Ethernet bootloader for wireless firmware updates
+
+**hardware**
+
+- Use the stm32f429 for development instead of the stm32f207 (More RAM, FPU for FIR filtering)
+
+- replace the MCP3208 external ADCs with the STM32's internal ADCs
+
+**repo structure**
+
+- discard the cube ide dump and replace with just the necessary source files, linker scripts, ioc files, toolchain etc.
+
+
+The original project objectives are listed below (To be archived)
+
 ## Overview
 This repository contains the STM32Cube IDE project with the firmware running on the STM32F407 controller for Proxima's Engine Control Box.
 The code aims to fulfil the same objective as [slonk](https://github.com/rice-eclipse/slonk) and [RESFET](https://github.com/rice-eclipse/resfet). These are as follows:
